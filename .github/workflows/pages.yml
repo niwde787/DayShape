@@ -1,4 +1,4 @@
-name: Deploy Forge to GitHub Pages
+name: Deploy DayShape to GitHub Pages
 on:
   push:
     branches: [main]

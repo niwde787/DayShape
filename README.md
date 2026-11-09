@@ -1,4 +1,4 @@
-# Forge
+# DayShape
 
 A touch-friendly family time planner for iPhone, iPad, and desktop. Static HTML, CSS, and JavaScript; no build dependencies or server database.
 
@@ -25,7 +25,7 @@ Push this folder as a repository with a `main` branch. Under Settings → Pages,
 1. Create a scoped **App folder** app at https://www.dropbox.com/developers/apps.
 2. Enable `files.content.read` and `files.content.write` permissions, and enable Allow public clients in OAuth settings for PKCE.
 3. Register the exact app URL as an OAuth redirect URI, including its trailing slash. For local testing add `http://127.0.0.1:4180/` separately.
-4. In Forge → Storage & sync, enter the app key and connect. Never embed an app secret or access token in source.
+4. In DayShape → Storage & sync, enter the app key and connect. Never embed an app secret or access token in source.
 5. Connect the same parent-owned Dropbox account on each device. App profiles share the family space; they are not access-control boundaries.
 
 Data is stored in `/forge-family-v1.json` within the app folder. Sync runs after edits and every minute while open. Tokens are session-scoped and expire; reconnect when required. Sync does not run while iOS suspends the app. Independent record updates merge; edits to the same record use newest timestamp, with a deterministic tie-break. Correct device clocks matter. Simultaneous uploads use Dropbox revisions and retry conflicts.
