@@ -11,6 +11,7 @@ Node.js 22+: `npm ci`, then `npm run dev`. Open http://127.0.0.1:4180. `npm run 
 - Loading screen, profile onboarding, and family profile switcher.
 - Planned and actual activity logging, exact time inputs, sliders, custom activities/categories, and recurring plans.
 - Daily, weekly, and monthly summaries; weekly minimum/maximum goals with neutral progress flags.
+- Light, dark, and device-following themes, saved per device. Gentle dashboard entrances, animated time totals, and goal bars respect Reduce Motion.
 - Local mode that preserves existing profiles. JSON export and an offline app shell.
 - Firebase parent accounts, email verification, password reset, family invitations, cloud saving, and account-scoped offline edits.
 - Explicit, repeatable import of this device's profiles into the signed-in family. No automatic upload of old local data.
