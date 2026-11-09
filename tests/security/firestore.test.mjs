@@ -20,3 +20,28 @@ test('parents cannot promote themselves, invite others, or rewrite ownership',as
 test('revocation stops subsequent reads and writes; owner cannot remove self',async()=>{const a=user('alice'),b=user('bob');await createFamily(a,'alice');await setDoc(doc(a,'families','alice','invites','bob@example.com'),invite('bob@example.com'));await join(b,'bob','alice');await assertSucceeds(deleteDoc(doc(a,'families','alice','members','bob')));await assertFails(getDocs(collection(b,'families','alice','records')));await assertFails(setDoc(doc(b,'families','alice','records','profiles__p'),record('bob')));await assertFails(deleteDoc(doc(a,'families','alice','members','alice')));});
 test('malformed record IDs, forged writers, and hard deletes are rejected',async()=>{const a=user('alice');await createFamily(a,'alice');await assertFails(setDoc(doc(a,'families','alice','records','wrong-id'),record('alice')));await assertFails(setDoc(doc(a,'families','alice','records','profiles__p'),record('mallory')));await setDoc(doc(a,'families','alice','records','profiles__p'),record('alice'));await assertFails(deleteDoc(doc(a,'families','alice','records','profiles__p')));const tombstone=record('alice');tombstone.value.deleted=true;await assertSucceeds(setDoc(doc(a,'families','alice','records','profiles__p'),tombstone));});
 test('knowing a family code alone is not an invitation',async()=>{await createFamily(user('alice'),'alice');await assertFails(join(user('bob'),'bob','alice'));await assertFails(setDoc(doc(user('bob'),'users','bob'),{familyId:'alice'}));});
+test('missing, null, or non-string email claims do not grant access',async()=>{
+  await createFamily(user('alice'),'alice');
+  for(const claims of [{},{email_verified:true},{email_verified:true,email:null},{email_verified:true,email:123},{email_verified:true,email:''}]) {
+    const db=env.authenticatedContext('alice',claims).firestore();
+    await assertFails(getDocs(collection(db,'families','alice','records')));
+  }
+});
+test('membership and user links cannot be created as partial writes',async()=>{
+  const a=user('alice'),b=user('bob');await createFamily(a,'alice');
+  await setDoc(doc(a,'families','alice','invites','bob@example.com'),invite('bob@example.com'));
+  await assertFails(setDoc(doc(b,'users','bob'),{familyId:'alice'}));
+  await assertFails(setDoc(doc(b,'families','alice','members','bob'),{uid:'bob',email:'bob@example.com',role:'parent'}));
+  await assertSucceeds(join(b,'bob','alice'));
+});
+test('number type permits numeric durations and rejects strings and invalid bounds',async()=>{
+  const a=user('alice');await createFamily(a,'alice');
+  for(const minutes of [60,15.5]) {
+    const row=record('alice');row.kind='goals';row.value.profileId='p';row.value.minutes=minutes;
+    await assertSucceeds(setDoc(doc(a,'families','alice','records','goals__p'),row));
+  }
+  for(const minutes of ['60',null,0,-1,10081]) {
+    const row=record('alice');row.kind='goals';row.value.profileId='p';row.value.minutes=minutes;
+    await assertFails(setDoc(doc(a,'families','alice','records','goals__p'),row));
+  }
+});

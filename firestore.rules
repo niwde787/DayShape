@@ -2,18 +2,26 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function verified() {
-      return request.auth != null && request.auth.token.email_verified == true;
+      return request.auth != null
+        && request.auth.token.get('email_verified', false) == true
+        && request.auth.token.get('email', '') is string
+        && request.auth.token.get('email', '').size() > 0;
     }
     function member(familyId) {
       return verified() && exists(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid));
     }
     function owner(familyId) {
-      return verified() && get(/databases/$(database)/documents/families/$(familyId)).data.ownerId == request.auth.uid;
+      return verified()
+        && exists(/databases/$(database)/documents/families/$(familyId))
+        && get(/databases/$(database)/documents/families/$(familyId)).data.ownerId == request.auth.uid;
     }
-    function myEmail() { return request.auth.token.email.lower(); }
+    function myEmail() { return verified() ? request.auth.token.email.lower() : ''; }
     function activeInvite(familyId) {
-      let invite = get(/databases/$(database)/documents/families/$(familyId)/invites/$(myEmail())).data;
-      return invite.email == myEmail() && invite.role == 'parent' && invite.expiresAt > request.time;
+      let path = /databases/$(database)/documents/families/$(familyId)/invites/$(myEmail());
+      return verified() && exists(path)
+        && get(path).data.email == myEmail()
+        && get(path).data.role == 'parent'
+        && get(path).data.expiresAt > request.time;
     }
     match /users/{uid} {
       allow get: if verified() && request.auth.uid == uid;
@@ -21,7 +29,6 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['familyId'])
         && request.resource.data.familyId is string
         && existsAfter(/databases/$(database)/documents/families/$(request.resource.data.familyId)/members/$(uid));
-      // Family switching is deliberately not supported in this version.
       allow update, delete, list: if false;
     }
     match /families/{familyId} {
@@ -80,7 +87,6 @@ service cloud.firestore {
           && (!(request.resource.data.kind in ['entries','goals','routines'])
             || (request.resource.data.value.minutes is number && request.resource.data.value.minutes > 0
               && request.resource.data.value.minutes <= 10080));
-        // Deletions are versioned tombstones, so offline clients cannot resurrect them.
         allow delete: if false;
       }
     }
