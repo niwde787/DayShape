@@ -40,6 +40,18 @@ test('unconfigured cloud keeps local onboarding, activity logging, and setup acc
     doc.querySelector('#entry-form').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));
     assert.match(doc.querySelector('#entry-error').textContent,/no more than 24 hours/);
     assert.equal(JSON.parse(window.localStorage.getItem('forge-data')).entries.length,1);
+    doc.querySelector('[data-action="close"]').click();
+    doc.querySelector('[data-action="profiles"]').click();
+    doc.querySelector('[data-remove-profile]').click();
+    doc.querySelector('#cancel-remove-profile').click();
+    assert.equal(JSON.parse(window.localStorage.getItem('forge-data')).profiles[0].deleted,undefined);
+    doc.querySelector('[data-remove-profile]').click();
+    doc.querySelector('#confirm-remove-profile').click();
+    const removed=JSON.parse(window.localStorage.getItem('forge-data'));
+    assert.equal(removed.profiles[0].deleted,true);
+    assert.equal(removed.entries[0].deleted,true);
+    assert.ok(removed.activities.every(a=>a.deleted));
+    assert.ok(doc.querySelector('#profile-form'),'Removing the final profile returns to onboarding');
   } finally {
     globalThis.setTimeout=realTimeout;globalThis.setInterval=realInterval;
     window.happyDOM.abort();

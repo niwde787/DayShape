@@ -19,6 +19,15 @@ export function suggestCategory(name){const s=name.toLowerCase();return /sleep|b
 export function mergeRecords(a,b){const m=new Map();for(const r of [...a,...b]){const old=m.get(r.id);if(!old||r.updatedAt>old.updatedAt||(r.updatedAt===old.updatedAt&&JSON.stringify(r)>JSON.stringify(old)))m.set(r.id,r);}return [...m.values()];}
 export function mergeData(a,b){const out={version:1};for(const k of ['profiles','activities','entries','goals','routines'])out[k]=mergeRecords(a[k]||[],b[k]||[]);return out;}
 export const live=a=>(a||[]).filter(x=>!x.deleted);
+export function removeProfileData(data,profileId,updatedAt=new Date().toISOString()) {
+  if(!live(data.profiles).some(p=>p.id===profileId))throw Error('This profile has already been removed.');
+  const next={...data};
+  for(const kind of ['profiles','activities','entries','goals','routines']) {
+    next[kind]=data[kind].map(record=>(kind==='profiles'?record.id===profileId:record.profileId===profileId)
+      ? {...record,deleted:true,updatedAt}:record);
+  }
+  return next;
+}
 export function totals(entries){return entries.reduce((n,e)=>n+e.minutes,0);}
 export function validateMinutes(value,others){return Number.isInteger(value)&&value>0&&value<=1440&&totals(others)+value<=1440;}
 export function routineEntries(data,profileId,date){const weekday=new Date(date+'T12:00:00').getDay();return live(data.routines).filter(r=>r.profileId===profileId&&r.days.includes(weekday)&&date>=r.startDate&&(!r.endDate||date<=r.endDate)).filter(r=>!data.entries.some(e=>e.routineId===r.id&&e.date===date)).map(r=>({...r,id:`${r.id}:${date}`,routineId:r.id,date,kind:'plan',virtual:true}));}
