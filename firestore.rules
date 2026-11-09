@@ -1,0 +1,88 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function verified() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    function member(familyId) {
+      return verified() && exists(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid));
+    }
+    function owner(familyId) {
+      return verified() && get(/databases/$(database)/documents/families/$(familyId)).data.ownerId == request.auth.uid;
+    }
+    function myEmail() { return request.auth.token.email.lower(); }
+    function activeInvite(familyId) {
+      let invite = get(/databases/$(database)/documents/families/$(familyId)/invites/$(myEmail())).data;
+      return invite.email == myEmail() && invite.role == 'parent' && invite.expiresAt > request.time;
+    }
+    match /users/{uid} {
+      allow get: if verified() && request.auth.uid == uid;
+      allow create: if verified() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['familyId'])
+        && request.resource.data.familyId is string
+        && existsAfter(/databases/$(database)/documents/families/$(request.resource.data.familyId)/members/$(uid));
+      // Family switching is deliberately not supported in this version.
+      allow update, delete, list: if false;
+    }
+    match /families/{familyId} {
+      allow get: if verified() && (request.auth.uid == familyId || member(familyId));
+      allow create: if verified() && familyId == request.auth.uid
+        && request.resource.data.keys().hasOnly(['name','ownerId','createdAt'])
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 60
+        && request.resource.data.createdAt == request.time
+        && !exists(/databases/$(database)/documents/users/$(request.auth.uid));
+      allow update, delete, list: if false;
+      match /members/{uid} {
+        allow get: if verified() && (uid == request.auth.uid || member(familyId));
+        allow list: if member(familyId);
+        allow create: if verified() && request.auth.uid == uid
+          && !exists(/databases/$(database)/documents/users/$(uid))
+          && request.resource.data.keys().hasOnly(['uid','email','role'])
+          && request.resource.data.uid == uid && request.resource.data.email == myEmail()
+          && getAfter(/databases/$(database)/documents/users/$(uid)).data.familyId == familyId
+          && ((familyId == uid && request.resource.data.role == 'owner'
+            && getAfter(/databases/$(database)/documents/families/$(familyId)).data.ownerId == uid)
+          || (request.resource.data.role == 'parent' && activeInvite(familyId)
+            && !existsAfter(/databases/$(database)/documents/families/$(familyId)/invites/$(myEmail()))));
+        allow update: if false;
+        allow delete: if owner(familyId) && uid != request.auth.uid;
+      }
+      match /invites/{email} {
+        allow get: if verified() && (owner(familyId) || email == myEmail());
+        allow list: if owner(familyId);
+        allow create, update: if owner(familyId)
+          && request.resource.data.keys().hasOnly(['email','role','expiresAt'])
+          && request.resource.data.email == email && email == email.lower()
+          && email.size() <= 254 && request.resource.data.role == 'parent'
+          && request.resource.data.expiresAt is timestamp
+          && request.resource.data.expiresAt > request.time
+          && request.resource.data.expiresAt <= request.time + duration.value(8, 'd');
+        allow delete: if verified() && (owner(familyId) || (email == myEmail()
+          && getAfter(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid)).data.email == myEmail()));
+      }
+      match /records/{recordId} {
+        allow read: if member(familyId);
+        allow create, update: if member(familyId)
+          && request.resource.data.keys().hasOnly(['kind','value','writerId','savedAt'])
+          && request.resource.data.writerId == request.auth.uid
+          && request.resource.data.savedAt == request.time
+          && request.resource.data.kind in ['profiles','activities','entries','goals','routines']
+          && request.resource.data.value is map && request.resource.data.value.size() <= 25
+          && request.resource.data.value.id is string
+          && request.resource.data.value.id.size() > 0 && request.resource.data.value.id.size() <= 160
+          && recordId == request.resource.data.kind + '__' + request.resource.data.value.id
+          && request.resource.data.value.updatedAt is string
+          && request.resource.data.value.updatedAt.size() <= 40
+          && (!('deleted' in request.resource.data.value) || request.resource.data.value.deleted is bool)
+          && (request.resource.data.kind == 'profiles' || request.resource.data.value.profileId is string)
+          && (!(request.resource.data.kind in ['entries','goals','routines'])
+            || (request.resource.data.value.minutes is number && request.resource.data.value.minutes > 0
+              && request.resource.data.value.minutes <= 10080));
+        // Deletions are versioned tombstones, so offline clients cannot resurrect them.
+        allow delete: if false;
+      }
+    }
+  }
+}

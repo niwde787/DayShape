@@ -1,37 +1,41 @@
 # DayShape
 
-A touch-friendly family time planner for iPhone, iPad, and desktop. Static HTML, CSS, and JavaScript; no build dependencies or server database.
+A touch-friendly family time planner for iPhone, iPad, and desktop, hosted on GitHub Pages.
 
 ## Run
 
-Requires Node.js 22+. Run `npm run dev`, then open http://127.0.0.1:4180. Run `npm test` for domain checks and `npm run build` for static output in `dist/`.
+Node.js 22+: `npm ci`, then `npm run dev`. Open http://127.0.0.1:4180. `npm run build` produces the static site in `dist/`.
 
-## Included
+## Features
 
-- Loading screen and family profile onboarding.
-- Daily actual and planned activity tracking, exact duration inputs, 15-minute slider/buttons, editable entries, and daily capacity checks.
-- Custom activities with editable suggested categories, weekday/daily/weekly recurring plans.
-- Day, week, and calendar-month summaries with category totals and planned/actual comparisons.
-- Week-specific minimum/maximum goals and neutral progress flags. Targets are chosen by the family, not represented as medical guidance.
-- Local persistence, offline app shell, profile switcher, JSON backup export.
-- Dropbox OAuth with PKCE and short-lived session tokens; revision-checked uploads, record-level merging, and deletion tombstones.
+- Loading screen, profile onboarding, and family profile switcher.
+- Planned and actual activity logging, exact time inputs, sliders, custom activities/categories, and recurring plans.
+- Daily, weekly, and monthly summaries; weekly minimum/maximum goals with neutral progress flags.
+- Local mode that preserves existing profiles. JSON export and an offline app shell.
+- Firebase parent accounts, email verification, password reset, family invitations, cloud saving, and account-scoped offline edits.
+- Explicit, repeatable import of this device's profiles into the signed-in family. No automatic upload of old local data.
 
-## GitHub Pages
+## Firebase setup
 
-Push this folder as a repository with a `main` branch. Under Settings → Pages, choose GitHub Actions. The included workflow tests, builds, and deploys `dist/`. Relative asset URLs support repository paths. GitHub hosts only source and app assets; family records are saved in the browser and the connected Dropbox app folder.
+Read **[FIREBASE_SETUP.md](./FIREBASE_SETUP.md)** or open the app's [setup guide](https://niwde787.github.io/forge/firebase-setup.html).
 
-## Dropbox setup
+The owner must provide the public Firebase web config in `firebase-config.js`, enable Email/Password authentication, create the default Standard Firestore database, authorize `niwde787.github.io`, and publish `firestore.rules`. With empty configuration, the app continues in local mode and shows setup instructions. No service-account credentials belong in this repository.
 
-1. Create a scoped **App folder** app at https://www.dropbox.com/developers/apps.
-2. Enable `files.content.read` and `files.content.write` permissions, and enable Allow public clients in OAuth settings for PKCE.
-3. Register the exact app URL as an OAuth redirect URI, including its trailing slash. For local testing add `http://127.0.0.1:4180/` separately.
-4. In DayShape → Storage & sync, enter the app key and connect. Never embed an app secret or access token in source.
-5. Connect the same parent-owned Dropbox account on each device. App profiles share the family space; they are not access-control boundaries.
+Parent members share all profiles in their family. Children do not need email accounts. The owner creates email-bound invitations and shares the family code manually; DayShape does not send invitation emails. Firebase sends verification and password-reset emails when requested in the app.
 
-Data is stored in `/forge-family-v1.json` within the app folder. Sync runs after edits and every minute while open. Tokens are session-scoped and expire; reconnect when required. Sync does not run while iOS suspends the app. Independent record updates merge; edits to the same record use newest timestamp, with a deterministic tie-break. Correct device clocks matter. Simultaneous uploads use Dropbox revisions and retry conflicts.
+## Checks and deployment
 
-## Current limits
+- `npm test`: app flow, offline queue, migration, and domain tests. Legacy Dropbox tests are retained for the old unused adapter.
+- `npm run test:rules`: Firestore emulator security tests using `demo-dayshape` (requires Java 21). Never connects to production.
+- `npm run build`: bundle Firebase and app JavaScript with esbuild.
+- GitHub Actions installs dependencies, runs both test suites, builds, and publishes to Pages. Firebase rules are deployed separately to the owner's Firebase project.
 
-Dropbox live authorization and cross-device behavior require the user's app registration and have not been verified with a live account. GitHub publication requires a working GitHub login. No medical recommendation engine, notifications, profile privacy locks, or backup import is included. Recurring plans are generated from their start date; stopping a routine ends it before the selected date and preserves earlier occurrences. Actual logs remain independent. Offline data can be lost if browser site data is cleared; connect Dropbox and export backups. Fonts use Google Fonts when available and system fallbacks offline.
+Only code and static assets are published to GitHub Pages. Family records live in the browser and, once configured and signed in, Firestore.
 
-On iPhone/iPad, open the deployed URL in Safari and use Share → Add to Home Screen.
+## Limits
+
+Cloud activation requires the owner's Firebase project and a live two-device check. Offline edits synchronize while the app is open and connected; iOS can suspend background activity. Last cloud write wins for concurrent edits to the same record; separate records sync independently. Keep one active editing tab per device. Sign out only after pending saves complete. A removed member may retain previously downloaded data. Account-to-family assignment is fixed in this version; family switching and rejoining after removal require administrator assistance.
+
+The previous Dropbox adapter is no longer used by the app. The original `forge-data` local key is retained so the rename and Firebase update do not erase existing device profiles. Clearing browser data can delete unsynced edits; export a backup first.
+
+Targets are family choices, not medical guidance. No recommendation engine, notifications, or child-only access restrictions are included.

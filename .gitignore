@@ -3,3 +3,6 @@ node_modules/
 *.log
 .env*
 test-results/
+.firebase/
+*-debug.log
+.tools/
