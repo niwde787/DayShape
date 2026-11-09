@@ -18,7 +18,7 @@ Node.js 22+: `npm ci`, then `npm run dev`. Open http://127.0.0.1:4180. `npm run 
 
 ## Firebase setup
 
-Read **[FIREBASE_SETUP.md](./FIREBASE_SETUP.md)** or open the app's [setup guide](https://niwde787.github.io/forge/firebase-setup.html).
+Read **[FIREBASE_SETUP.md](./FIREBASE_SETUP.md)** or open the app's [setup guide](https://niwde787.github.io/DayShape/firebase-setup.html).
 
 The owner must provide the public Firebase web config in `firebase-config.js`, enable Email/Password authentication, create the default Standard Firestore database, authorize `niwde787.github.io`, and publish `firestore.rules`. With empty configuration, the app continues in local mode and shows setup instructions. No service-account credentials belong in this repository.
 
@@ -32,6 +32,18 @@ Parent members share all profiles in their family. Children do not need email ac
 - GitHub Actions installs dependencies, runs both test suites, builds, and publishes to Pages. Firebase rules are deployed separately to the owner's Firebase project.
 
 Only code and static assets are published to GitHub Pages. Family records live in the browser and, once configured and signed in, Firestore.
+
+## Repository and address
+
+Repository: [niwde787/DayShape](https://github.com/niwde787/DayShape). App: [DayShape](https://niwde787.github.io/DayShape/). Use the capitalized path exactly. The local checkout folder can remain named `forge`; its name does not affect deployment.
+
+After moving from `/forge/`, update bookmarks and Home Screen shortcuts. GitHub redirects old repository URLs but does not provide a redirect for the old Pages site. Do not recreate a `forge` repository just to reuse its name; doing so would remove GitHub's repository redirect.
+
+Firebase project `dayshape-630e7`, user accounts, family records, rules, and authorized hostname `niwde787.github.io` stay unchanged. The application uses Firebase's default verification/reset handlers, with no hard-coded `/forge/` callback. If custom links were added manually in Firebase email templates or other services, update them separately.
+
+Browser storage keys are intentionally retained. In the same browser storage context the origin is unchanged, so local profiles and pending cloud writes remain accessible. Installed iPhone/iPad web apps can have separate storage: open the old installation, let cloud saves complete, and export a backup before replacing its shortcut. Verify profiles in the new installation before removing the old one. Do not clear website data as part of the rename.
+
+Assets and the manifest use relative paths. The service worker now cleans only caches for its own scope, preserving legacy and other app caches during the transition. No Firebase database migration or new API keys are required.
 
 ## Limits
 
