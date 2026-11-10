@@ -7,6 +7,7 @@ before(async()=>{env=await initializeTestEnvironment({projectId:'demo-dayshape',
 after(async()=>{await env?.cleanup();});
 beforeEach(async()=>{await env.clearFirestore();});
 const user=(uid,email=uid+'@example.com',verified=true)=>env.authenticatedContext(uid,{email,email_verified:verified}).firestore();
+test('notification phone numbers, tokens, proofs and delivery logs are server-only',async()=>{const a=user('alice');for(const name of ['notificationRecipients','notificationPhoneProofs','notificationDeliveries','notificationRateLimits']){await assertFails(setDoc(doc(a,name,'test'),{uid:'alice',phone:'+15551234567'}));await assertFails(getDoc(doc(a,name,'test')));await assertFails(getDocs(collection(a,name)));}});
 async function createFamily(db,uid){const b=writeBatch(db);b.set(doc(db,'families',uid),{ownerId:uid,name:'Our family',createdAt:serverTimestamp()});b.set(doc(db,'families',uid,'members',uid),{uid,email:uid+'@example.com',role:'owner'});b.set(doc(db,'users',uid),{familyId:uid});await b.commit();}
 const invite=(email,days=7)=>({email,role:'parent',expiresAt:Timestamp.fromMillis(Date.now()+days*86400000)});
 const record=uid=>({kind:'profiles',writerId:uid,savedAt:serverTimestamp(),value:{id:'p',name:'Child',age:'child',avatar:'🌱',updatedAt:new Date().toISOString()}});

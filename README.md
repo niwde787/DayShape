@@ -51,7 +51,7 @@ Cloud activation requires the owner's Firebase project and a live two-device che
 
 The previous Dropbox adapter is no longer used by the app. The original `forge-data` local key is retained so the rename and Firebase update do not erase existing device profiles. Clearing browser data can delete unsynced edits; export a backup first.
 
-Targets are family choices, not medical guidance. No notifications or child-only access restrictions are included.
+Targets are family choices, not medical guidance. Profile reminders support opt-in push and optional verified SMS once the notification backend is deployed and configured. See [notification setup](./NOTIFICATIONS_SETUP.md). Child-only access restrictions are not included.
 
 ## Time balance and trends
 

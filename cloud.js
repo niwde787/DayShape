@@ -1,4 +1,5 @@
 import {initializeApp} from 'firebase/app';
+import {detachDevicePush,listenForForegroundPush} from './notification-client.js';
 import {getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword,
   sendEmailVerification, sendPasswordResetEmail, signOut, reload} from 'firebase/auth';
 import {getFirestore, doc, collection, getDocFromServer, onSnapshot, setDoc, deleteDoc,
@@ -34,6 +35,7 @@ export class FamilyCloud {
   start() {
     if (!configured) return;
     this.app=initializeApp(firebaseConfig);
+    listenForForegroundPush(this.app).catch(()=>{});
     this.auth=getAuth(this.app);
     // The durable, account-scoped outbox lives in CloudStore. Firestore uses its
     // default memory cache to avoid leaving a second private cache after sign-out.
@@ -141,6 +143,7 @@ export class FamilyCloud {
   async logout() {
     if(this.store&&Object.keys(this.store.pending).length)throw Error('Some changes are still waiting to sync. Reconnect and wait for “Saved to cloud” before signing out.');
     const key=this.store?.key;
+    await detachDevicePush();
     await signOut(this.auth);
     if(key)localStorage.removeItem(key);
   }
