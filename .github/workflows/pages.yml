@@ -29,6 +29,8 @@ jobs:
       - run: npm ci --prefix functions
       - run: node --check functions/index.js
       - run: npm test
+      - run: node email-script/build.mjs
+      - run: git diff --exit-code -- email-script/Report.gs email-script/sample-report.html
       - run: npm run test:rules
       - run: npm run build
       - uses: actions/configure-pages@v5

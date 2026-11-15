@@ -62,3 +62,7 @@ Open **Targets & screens** in Weekly balance & trends to set a profile's weekly 
 The weekly insight panel follows the week containing the selected date, including on the month view. It shows four weeks of recorded totals and screen time, with logged-day coverage. It flags exceeded screen/activity limits and increases of more than 50% and at least 60 minutes over the average of matching weekdays in two or more of the prior four weeks. Each compared weekday must have an entry in both periods. Blank days are unknown, future actual entries are excluded, and plans never affect trends. Even logged days may be incomplete; these comparisons describe records, not diagnoses. New profiles show a history-building message until there is enough comparable data.
 
 The uploaded weekday example is described as an illustration, not multiplied into a prescribed weekly schedule. [CDC sleep guidance](https://www.cdc.gov/sleep/about/) gives 9–12 hours for ages 6–12 and 8–10 for ages 13–17. The app links to the [AAP family media plan](https://www.healthychildren.org/English/family-life/Media/Pages/How-to-Make-a-Family-Media-Use-Plan.aspx) so families can choose screen habits together.
+# Weekly email reports
+
+Monday reports can run on Firebase Spark using a private Google Apps Script sender. The app's **Account → Weekly email report** screen saves each verified parent's opt-in. Delivery remains pending until the owner authorizes and installs the script. See [setup instructions](WEEKLY_EMAIL_SETUP.md).
+

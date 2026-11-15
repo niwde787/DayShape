@@ -1,7 +1,9 @@
 import {configured, friendlyError} from './cloud.js';
+import {createWeeklyEmailUI} from './weekly-email-ui.js';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function createAccountUI({cloud,getState,getLocal,modal,close,toast,exportData}) {
   let authMode='login';
+  const weeklyEmail=createWeeklyEmailUI({cloud,getState,modal,toast});
   const button=(text,action,style='secondary full')=>`<button type="button" class="${style}" data-account="${action}">${text}</button>`;
   function show() {
     const state=getState();
@@ -23,6 +25,7 @@ export function createAccountUI({cloud,getState,getLocal,modal,close,toast,expor
     }
     modal(`${body}<div id="account-message" role="status"></div><hr><h3>Keep a copy</h3><p class="fine">Download a backup of the profiles currently open.</p>${button('↓ Export backup','export')}`);
     bindForms();
+    if(state.user?.emailVerified&&state.family){const target=document.querySelector('#account-message');target.insertAdjacentHTML('beforebegin',button('Weekly email report','weekly-email'));}
   }
   async function run(action,{refresh=true}={}) {
     const dialog=document.querySelector('#modal');
@@ -49,6 +52,7 @@ export function createAccountUI({cloud,getState,getLocal,modal,close,toast,expor
     const action=el.dataset.account;if(!action)return;
     if(action==='login-tab'||action==='register-tab'){authMode=action==='login-tab'?'login':'register';show();}
     else if(action==='back')show();
+    else if(action==='weekly-email')weeklyEmail.show();
     else if(action==='export')exportData();
     else if(action==='logout')run(()=>cloud.logout());
     else if(action==='verify')run(()=>cloud.refreshVerification());

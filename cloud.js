@@ -137,6 +137,16 @@ export class FamilyCloud {
     await sendEmailVerification(credential.user);
   }
   login(email,password){return signInWithEmailAndPassword(this.auth,email.trim(),password);}
+  async weeklyEmailSettings(){
+    if(!this.user?.emailVerified||!this.family)throw Error('Open your verified family account first.');
+    const [preference,service]=await Promise.all([getDocFromServer(doc(this.db,'weeklyEmailPreferences',this.user.uid)),getDocFromServer(doc(this.db,'deliveryServices','weeklyEmail'))]);
+    return {preference:preference.data(),service:service.data()};
+  }
+  async saveWeeklyEmail(enabled){
+    if(!this.user?.emailVerified||!this.family)throw Error('Open your verified family account first.');
+    if(!navigator.onLine)throw Error('Reconnect to save your email preference.');
+    await setDoc(doc(this.db,'weeklyEmailPreferences',this.user.uid),{enabled:enabled===true,email:this.user.email.toLowerCase(),familyId:this.family.id,consentVersion:1,updatedAt:serverTimestamp()});
+  }
   resetPassword(email){return sendPasswordResetEmail(this.auth,email.trim());}
   resendVerification(){return sendEmailVerification(this.auth.currentUser);}
   async refreshVerification(){await reload(this.auth.currentUser);await this.auth.currentUser.getIdToken(true);await this.loadAccount(this.auth.currentUser);}

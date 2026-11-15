@@ -11,6 +11,21 @@ test('notification phone numbers, tokens, proofs and delivery logs are server-on
 async function createFamily(db,uid){const b=writeBatch(db);b.set(doc(db,'families',uid),{ownerId:uid,name:'Our family',createdAt:serverTimestamp()});b.set(doc(db,'families',uid,'members',uid),{uid,email:uid+'@example.com',role:'owner'});b.set(doc(db,'users',uid),{familyId:uid});await b.commit();}
 const invite=(email,days=7)=>({email,role:'parent',expiresAt:Timestamp.fromMillis(Date.now()+days*86400000)});
 const record=uid=>({kind:'profiles',writerId:uid,savedAt:serverTimestamp(),value:{id:'p',name:'Child',age:'child',avatar:'🌱',updatedAt:new Date().toISOString()}});
+test('weekly emails require own verified email, membership and private preferences',async()=>{
+  const a=user('alice'),b=user('bob');await createFamily(a,'alice');await createFamily(b,'bob');
+  const p={enabled:true,email:'alice@example.com',familyId:'alice',consentVersion:1,updatedAt:serverTimestamp()};
+  await assertSucceeds(setDoc(doc(a,'weeklyEmailPreferences','alice'),p));
+  await assertSucceeds(getDoc(doc(a,'weeklyEmailPreferences','alice')));
+  await assertFails(getDoc(doc(b,'weeklyEmailPreferences','alice')));
+  await assertFails(getDocs(collection(a,'weeklyEmailPreferences')));
+  for(const patch of [{email:'other@example.com'},{familyId:'bob'},{consentVersion:0},{enabled:'yes'},{extra:'field'}])await assertFails(setDoc(doc(a,'weeklyEmailPreferences','alice'),{...p,...patch}));
+  await assertFails(setDoc(doc(user('alice','alice@example.com',false),'weeklyEmailPreferences','alice'),p));
+  await assertFails(setDoc(doc(a,'deliveryServices','weeklyEmail'),{enabled:true}));
+  await assertSucceeds(getDoc(doc(a,'deliveryServices','weeklyEmail')));
+  await assertFails(getDoc(doc(a,'weeklyEmailDeliveries','alice__2026-11-09')));
+  await assertFails(setDoc(doc(a,'weeklyEmailDeliveries','alice__2026-11-09'),{status:'sent'}));
+  await assertSucceeds(setDoc(doc(a,'weeklyEmailPreferences','alice'),{...p,enabled:false}));
+});
 function join(db,uid,family,email=uid+'@example.com'){const b=writeBatch(db);b.set(doc(db,'users',uid),{familyId:family});b.set(doc(db,'families',family,'members',uid),{uid,email,role:'parent'});b.delete(doc(db,'families',family,'invites',email));return b.commit();}
 test('verified parent can create family atomically and sync records',async()=>{const db=user('alice');await assertSucceeds(createFamily(db,'alice'));await assertSucceeds(setDoc(doc(db,'families','alice','records','profiles__p'),record('alice')));await assertSucceeds(getDocs(collection(db,'families','alice','records')));});
 test('unauthenticated and unverified clients cannot create or read families',async()=>{await createFamily(user('alice'),'alice');const guest=env.unauthenticatedContext().firestore();await assertFails(getDoc(doc(guest,'families','alice')));await assertFails(createFamily(user('bob','bob@example.com',false),'bob'));await assertFails(getDocs(collection(user('alice','alice@example.com',false),'families','alice','records')));});
