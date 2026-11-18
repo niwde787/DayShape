@@ -1,12 +1,15 @@
+import {accountPanel,accessRows} from './account-panel.js';
 import {configured, friendlyError} from './cloud.js';
 import {createWeeklyEmailUI} from './weekly-email-ui.js';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-export function createAccountUI({cloud,getState,getLocal,modal,close,toast,exportData}) {
-  let authMode='login';
-  const weeklyEmail=createWeeklyEmailUI({cloud,getState,modal,toast});
+export function createAccountUI({cloud,getState,getLocal,modal,close,toast,exportData,getData=()=>({profiles:[]}),openProfile,editProfile,removeProfile,addProfile,openReminders}) {
+  let authMode='login',section='overview',generation=0,accountId=null;
+  const reportModal=html=>modal(html+button('← Back to control panel','back','quiet full'));
+  const weeklyEmail=createWeeklyEmailUI({cloud,getState,modal:reportModal,toast});
   const button=(text,action,style='secondary full')=>`<button type="button" class="${style}" data-account="${action}">${text}</button>`;
   function show() {
-    const state=getState();
+    const state=getState(),ticket=++generation;
+    if(accountId!==state.user?.uid){section='overview';accountId=state.user?.uid;}
     let body='';
     if(!configured) {
       body=`<div class="eyebrow">CLOUD SAVING IS NEXT</div><h2>One family. Every device.</h2><p>Firebase is ready to connect, but the app owner still needs to finish setup. Your existing profiles continue saving on this device.</p><a class="primary full" href="./firebase-setup.html" target="_blank" rel="noopener">View setup instructions ↗</a>`;
@@ -19,13 +22,16 @@ export function createAccountUI({cloud,getState,getLocal,modal,close,toast,expor
     } else if(!state.family) {
       body=`<div class="eyebrow">YOUR FAMILY’S SPACE</div><h2>Bring your days together.</h2><p>Signed in as ${esc(state.user.email)}.</p>${state.error?`<p class="form-error">${esc(state.error)}</p>${button('Try loading again','retry')}`:''}<form id="create-family"><label>Start a new family space<input name="name" placeholder="e.g. Our family" maxlength="60" required></label><button class="primary full">Create family space ↗</button></form><hr><form id="join-family"><label>Already invited? Enter your family code<input name="code" placeholder="Code shared by the family owner" required maxlength="128" autocomplete="off"></label><p class="fine">The owner must invite ${esc(state.user.email)} first. If your spouse already created a space, join theirs instead of creating another.</p><button class="secondary full">Join family</button></form>${button('Sign out','logout','quiet full')}`;
     } else {
-      const owner=state.family.ownerId===state.user.uid;
-      const local=getLocal();
-      body=`<div class="eyebrow">YOUR FAMILY, CONNECTED</div><h2>${esc(state.family.name)}</h2><p>${esc(state.user.email)}<br>${owner?'Family owner':'Parent account'} · All family profiles are shared.</p><div class="storage-status">☁ <div><strong>${esc(state.status)}</strong><small>Changes sync while DayShape is open and online.</small></div></div>${button('Try sync again','sync','primary full')}${local.profiles.length?`<div class="import-panel"><h3>Bring your device profiles along</h3><p>${local.profiles.filter(p=>!p.deleted).length} local profile(s) are available on this device. Importing shares their activities and history with everyone in this family.</p>${button('Import this device’s profiles','import')}</div>`:''}${owner?`<hr><h3>Add another parent</h3><p class="fine">Invite their exact account email, then share the family code yourself. No invitation email is sent.</p><form id="invite-parent"><label>Parent’s email<input name="email" type="email" required maxlength="254" placeholder="parent@example.com"></label><button class="secondary full">Create invitation</button></form><label class="account-code">Family code<input readonly value="${esc(state.family.id)}" aria-label="Family code"></label>${button('Copy family code','copy-code','quiet full')}${button('Manage family access','manage','quiet full')}`:''}<hr>${button('Sign out of this device','logout','quiet full')}<p class="fine">Offline edits are kept in a private account-specific copy on this device. Signing out requires all edits to finish syncing.</p>`;
+      let local;try{local=getLocal();}catch{local={profiles:[]};}
+      modal(accountPanel({state,data:getData(),local,section}));bindForms();
+      if(section==='access')cloud.accessList().then(list=>{
+        const target=document.querySelector('#panel-access-list');
+        if(ticket===generation&&getState().user?.uid===state.user.uid&&getState().family?.id===state.family.id&&target)target.innerHTML=accessRows(list,state);
+      }).catch(error=>{const target=document.querySelector('#panel-access-list');if(ticket===generation&&target)target.textContent=friendlyError(error);});
+      return;
     }
     modal(`${body}<div id="account-message" role="status"></div><hr><h3>Keep a copy</h3><p class="fine">Download a backup of the profiles currently open.</p>${button('↓ Export backup','export')}`);
     bindForms();
-    if(state.user?.emailVerified&&state.family){const target=document.querySelector('#account-message');target.insertAdjacentHTML('beforebegin',button('Weekly email report','weekly-email'));}
   }
   async function run(action,{refresh=true}={}) {
     const dialog=document.querySelector('#modal');
@@ -41,15 +47,18 @@ export function createAccountUI({cloud,getState,getLocal,modal,close,toast,expor
     form('join-family',async f=>{await cloud.joinFamily(f.get('code'));close();toast('You’re part of the family.');});
     form('invite-parent',async f=>{await cloud.invite(f.get('email'));toast('Invitation created for 7 days. Share your family code with them.');});
   }
-  async function manage() {
-    const {members,invites}=await cloud.accessList();
-    modal(`<div class="eyebrow">FAMILY ACCESS</div><h2>Who shares this space?</h2><p>Removing a parent stops future cloud access. It cannot erase copies they previously downloaded.</p><div class="access-list">${members.map(m=>`<div><span>${esc(m.email)}<small>${esc(m.role)}</small></span>${m.uid!==getState().user.uid?`<button class="danger" data-remove-member="${esc(m.uid)}">Remove</button>`:''}</div>`).join('')}</div><h3>Pending invitations</h3><div class="access-list">${invites.length?invites.map(i=>`<div><span>${esc(i.email)}<small>${i.expiresAt.toMillis()>Date.now()?'Expires '+i.expiresAt.toDate().toLocaleDateString():'Expired'}</small></span><button class="danger" data-revoke-invite="${esc(i.id)}">Revoke</button></div>`).join(''):'<p>No pending invitations.</p>'}</div><div id="account-message" role="status"></div>${button('Back to account','back')}`);
-  }
   document.addEventListener('click',e=>{
     const el=e.target.closest('button');if(!el)return;
-    if(el.dataset.removeMember){run(async()=>{await cloud.removeMember(el.dataset.removeMember);await manage();},{refresh:false});return;}
-    if(el.dataset.revokeInvite){run(async()=>{await cloud.revokeInvite(el.dataset.revokeInvite);await manage();},{refresh:false});return;}
-    const action=el.dataset.account;if(!action)return;
+    if(el.dataset.removeMember){
+      const state=getState(),uid=el.dataset.removeMember;if(state.family?.ownerId!==state.user?.uid||uid===state.user.uid)return;
+      const email=el.closest('.access-list>div')?.querySelector('span')?.firstChild?.textContent||'this parent';
+      modal('<h2>Remove parent access?</h2><p>'+esc(email)+'</p><p>This stops future access to the shared family. It does not remove family profiles or erase previously downloaded copies.</p>'+button('Keep access','back')+'<button class="danger full" id="confirm-parent-removal">Remove access</button><div id="account-message" role="status"></div>');
+      document.querySelector('#confirm-parent-removal').onclick=()=>run(async()=>{if(getState().user?.uid!==state.user.uid||getState().family?.id!==state.family.id)throw Error('Your account changed. Reopen access settings.');await cloud.removeMember(uid);});return;}
+    if(el.dataset.revokeInvite){run(async()=>{await cloud.revokeInvite(el.dataset.revokeInvite);});return;}
+    if(el.dataset.panelProfile){openProfile?.(el.dataset.panelProfile);return;}if(el.dataset.panelEdit){editProfile?.(el.dataset.panelEdit,show);return;}if(el.dataset.panelRemove){removeProfile?.(el.dataset.panelRemove);return;}if(el.dataset.panelReminder){openReminders?.(el.dataset.panelReminder);return;}const action=el.dataset.account;if(!action)return;
+    if(action.startsWith('section-')){section=action.slice(8);show();return;}
+    if(action==='add-profile'){addProfile?.();return;}
+    if(action==='reset-current'){run(async()=>{await cloud.resetPassword(getState().user.email);toast('Password reset email sent. Check your inbox.');});return;}
     if(action==='login-tab'||action==='register-tab'){authMode=action==='login-tab'?'login':'register';show();}
     else if(action==='back')show();
     else if(action==='weekly-email')weeklyEmail.show();
@@ -61,7 +70,6 @@ export function createAccountUI({cloud,getState,getLocal,modal,close,toast,expor
     else if(action==='sync')run(()=>cloud.flush());
     else if(action==='import')run(async()=>{cloud.importLocal(getLocal());toast('Device profiles imported. Cloud saving is in progress.');});
     else if(action==='copy-code')run(async()=>{await navigator.clipboard.writeText(getState().family.id);toast('Family code copied.');},{refresh:false});
-    else if(action==='manage')run(manage,{refresh:false});
     else if(action==='reset') {
       const email=document.querySelector('#account-auth [name=email]');
       if(!email?.value||!email.checkValidity()){toast('Enter your email above, then tap Forgot your password.');return;}

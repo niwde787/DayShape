@@ -64,6 +64,10 @@ The weekly insight panel follows the week containing the selected date, includin
 The uploaded weekday example is described as an illustration, not multiplied into a prescribed weekly schedule. [CDC sleep guidance](https://www.cdc.gov/sleep/about/) gives 9–12 hours for ages 6–12 and 8–10 for ages 13–17. The app links to the [AAP family media plan](https://www.healthychildren.org/English/family-life/Media/Pages/How-to-Make-a-Family-Media-Use-Plan.aspx) so families can choose screen habits together.
 # Weekly email reports
 
+## Account control panel
+
+Open **Account & sync** after signing in to manage account details, family profiles, parent access, reports/reminders, and sync/backups in separate sections. Profile details can be edited without changing activity history or profile IDs. Only the owner can invite parents, revoke invitations, or remove another parent's access; access removal asks for confirmation. Other parents can view the member list. Profile removal and parent account access are separate actions.
+
 ## Smarter planning
 
 - **Repeating schedule** on the dashboard provides School (Mon–Fri), Sleep (daily), and Practice shortcuts, custom weekdays, start/end times, and an optional last date. Overnight durations belong to the starting date. These are plans, not automatic actual logs.

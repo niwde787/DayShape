@@ -195,7 +195,7 @@ export class FamilyCloud {
   async accessList() {
     const {getDocs}=await import('firebase/firestore');
     const id=this.family.id;
-    const [members,invites]=await Promise.all([getDocs(collection(this.db,'families',id,'members')),getDocs(collection(this.db,'families',id,'invites'))]);
+    const [members,invites]=await Promise.all([getDocs(collection(this.db,'families',id,'members')),this.family.ownerId===this.user.uid?getDocs(collection(this.db,'families',id,'invites')):Promise.resolve({docs:[]})]);
     return {members:members.docs.map(x=>({id:x.id,...x.data()})),invites:invites.docs.map(x=>({id:x.id,...x.data()}))};
   }
   revokeInvite(email){return deleteDoc(doc(this.db,'families',this.family.id,'invites',email));}

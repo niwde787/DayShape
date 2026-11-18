@@ -40,8 +40,16 @@ test('sign-in isolates cloud profiles; migration is explicit; sign-out restores 
     assert.doesNotMatch(doc.querySelector('main').textContent,/DEVICE CHILD/);
     assert.equal(globalThis.testCloud.imports.length,0);assert.equal(globalThis.testCloud.saved.length,0);
     assert.match(doc.querySelector('#modal').textContent,/Cloud family/);
+    doc.querySelector('[data-account="section-data"]').click();
     doc.querySelector('[data-account="import"]').click();await tick();
     assert.equal(globalThis.testCloud.imports.length,1);assert.equal(globalThis.testCloud.imports[0].profiles[0].id,'local-child');
+    doc.querySelector('[data-account="section-profiles"]').click();
+    doc.querySelector('[data-panel-edit="cloud-child"]').click();
+    const edit=doc.querySelector('#edit-profile-form');edit.elements.name.value='Updated child';edit.elements.age.value='teen';
+    edit.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));
+    assert.equal(globalThis.testCloud.saved.at(-1).profiles[0].name,'Updated child');
+    assert.equal(globalThis.testCloud.saved.at(-1).profiles[0].id,'cloud-child');
+    doc.querySelector('[data-account="section-details"]').click();
     doc.querySelector('[data-account="logout"]').click();await tick();
     assert.match(doc.querySelector('main').textContent,/DEVICE CHILD/);assert.doesNotMatch(doc.querySelector('main').textContent,/CLOUD CHILD/);
     assert.deepEqual(JSON.parse(window.localStorage.getItem('forge-data')),local);
