@@ -2,9 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {scheduleMinutes,completePlan,routineModal} from '../routines.js';
 import {routineEntries} from '../domain.js';
-import {previousWeekComparison} from '../insights.js';
+import {previousWeekComparison,previousWeekView} from '../insights.js';
 import {Window} from 'happy-dom';
 const p={id:'p'},plan={id:'r:2026-11-18',profileId:'p',activityId:'school',kind:'plan',date:'2026-11-18',minutes:450};
+test('previous full week includes Thursday through Sunday when current week is Wednesday',()=>{
+  const data={activities:[{id:'school',profileId:'p',name:'School'}],entries:[{...plan,id:'last-thursday',date:'2026-11-12',kind:'actual',minutes:450},{...plan,id:'last-sunday',date:'2026-11-15',kind:'actual',minutes:60}]};
+  const c=previousWeekComparison(data,p,'2026-11-18','2026-11-18');assert.equal(c.rows[0].previous,0);assert.equal(c.rows[0].previousFull,510);assert.equal(c.previousFullCoverage,2);
+  const html=previousWeekView(data,p,'2026-11-18','2026-11-18');assert.match(html,/8h 30m/);assert.match(html,/2026-11-09 – 2026-11-15/);assert.match(html,/No entries/);assert.match(html,/Week not finished/);assert.doesNotMatch(html,/↓/);
+});
+test('comparison dates cross year boundaries and filter plans, deleted entries and other profiles',()=>{
+  const base={...plan,kind:'actual',date:'2026-12-31'};
+  const data={activities:[],entries:[base,{...base,id:'plan',kind:'plan',minutes:999},{...base,id:'deleted',deleted:true,minutes:999},{...base,id:'other',profileId:'other',minutes:999}]};
+  const c=previousWeekComparison(data,p,'2027-01-06','2027-01-06');assert.equal(c.previousFullDates[0],'2026-12-28');assert.equal(c.previousFullDates[6],'2027-01-03');assert.equal(c.rows[0].previousFull,450);
+});
 test('school and overnight sleep calculate correct schedule durations',()=>{assert.equal(scheduleMinutes('08:00','15:30'),450);assert.equal(scheduleMinutes('20:30','07:00'),630);assert.throws(()=>scheduleMinutes('08:00','08:00'));assert.throws(()=>scheduleMinutes('25:00','07:00'));});
 test('completion retains plan and deduplicates across devices and repeated taps',()=>{
   const data={entries:[],routines:[{id:'r',profileId:'p',activityId:'school',days:[3],startDate:'2026-11-18',minutes:450}]};

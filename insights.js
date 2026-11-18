@@ -11,17 +11,22 @@ export function timeBalance(actual, planned, days) {
 export function previousWeekComparison(data,profile,selected,today=dateKey()){
   const dates=rangeDates(selected,'week').filter(d=>d<=today),previous=dates.map(d=>shiftDate(d,-7));
   const rows=live(data.entries).filter(e=>e.profileId===profile.id&&e.kind==='actual'&&e.date<=today);
-  const current=rows.filter(e=>dates.includes(e.date)),prior=rows.filter(e=>previous.includes(e.date));
+  const fullDates=rangeDates(selected,'week'),previousFullDates=fullDates.map(d=>shiftDate(d,-7));
+  const current=rows.filter(e=>dates.includes(e.date)),prior=rows.filter(e=>previous.includes(e.date)),priorFull=rows.filter(e=>previousFullDates.includes(e.date));
   const coverage=items=>new Set(items.map(e=>e.date)).size;
   const activities=data.activities.filter(a=>a.profileId===profile.id),byId=new Map(activities.map(a=>[a.id,a]));
   const measures=[{name:'Total recorded',sum:totals},{name:'Screen time',sum:xs=>totals(xs.filter(e=>isScreen(byId.get(e.activityId))))},...activities.filter(a=>!a.deleted).map(a=>({name:a.name,sum:xs=>totals(xs.filter(e=>e.activityId===a.id))}))];
-  return {days:dates.length,currentCoverage:coverage(current),previousCoverage:coverage(prior),comparable:dates.length>0&&coverage(current)===dates.length&&coverage(prior)===dates.length,
-    rows:measures.map(m=>({name:m.name,current:m.sum(current),previous:m.sum(prior),delta:m.sum(current)-m.sum(prior)})).filter((r,i)=>i<2||r.current||r.previous)};
+  return {dates,previousDates:previous,fullDates,previousFullDates,previousFullCoverage:coverage(priorFull),days:dates.length,currentCoverage:coverage(current),previousCoverage:coverage(prior),comparable:dates.length>0&&coverage(current)===dates.length&&coverage(prior)===dates.length,
+    rows:measures.map(m=>({name:m.name,current:m.sum(current),previous:m.sum(prior),previousFull:m.sum(priorFull),delta:m.sum(current)-m.sum(prior)})).filter((r,i)=>i<2||r.current||r.previous||r.previousFull)};
 }
-function previousWeekView(data,profile,date){
-  const c=previousWeekComparison(data,profile,date);
-  if(!c.days)return '<section class="week-comparison"><h3>This week vs. last week</h3><p class="fine">This week has not started yet. Recorded comparisons appear when it begins.</p></section>';
-  return `<section class="week-comparison"><h3>This week vs. last week</h3><p class="fine">Matching ${c.days} weekday${c.days===1?'':'s'} · ${c.currentCoverage}/${c.days} days logged this week; ${c.previousCoverage}/${c.days} last week. ${c.days<7?'Today may still be incomplete.':''}</p>${c.comparable?'':'<p class="fine">Missing days are unknown. Changes will appear once both periods have entries on every compared day.</p>'}<div class="comparison-scroll"><table><thead><tr><th>Activity</th><th>This week</th><th>Last week</th><th>Change</th></tr></thead><tbody>${c.rows.map(r=>`<tr><th>${esc(r.name)}</th><td>${duration(r.current)}</td><td>${duration(r.previous)}</td><td>${c.comparable?(r.delta===0?'Same':`${r.delta>0?'↑':'↓'} ${duration(Math.abs(r.delta))}`):'Incomplete'}</td></tr>`).join('')}</tbody></table></div><p class="fine">Totals reflect logged time only. More or less time is a conversation starter, not a score.</p></section>`;
+export function previousWeekView(data,profile,date,today=dateKey()){
+  const c=previousWeekComparison(data,profile,date,today);
+  const period=ds=>ds.length?ds[0]+' – '+ds[ds.length-1]:'';
+  const label=(n,coverage)=>coverage?duration(n):'No entries';
+  const fullComparable=c.days===7&&c.fullDates[6]<today&&c.comparable;
+  const change=r=>fullComparable?(r.delta===0?'Same':(r.delta>0?'↑ ':'↓ ')+duration(Math.abs(r.delta))):c.fullDates[6]>=today?'Week not finished':'Incomplete logging';
+  const table=(matched=false)=>'<div class="comparison-scroll"><table><thead><tr><th>Activity</th><th>Selected '+(matched?'weekdays':'week so far')+'</th><th>'+(matched?'Previous matching weekdays':'Previous full week')+'</th><th>Change</th></tr></thead><tbody>'+c.rows.map(r=>'<tr><th>'+esc(r.name)+'</th><td>'+label(r.current,c.currentCoverage)+'</td><td>'+label(matched?r.previous:r.previousFull,matched?c.previousCoverage:c.previousFullCoverage)+'</td><td>'+(matched?(c.comparable?(r.delta===0?'Same':(r.delta>0?'↑ ':'↓ ')+duration(Math.abs(r.delta))):'Incomplete logging'):change(r))+'</td></tr>').join('')+'</tbody></table></div>';
+  return '<section class="week-comparison"><h3>This week vs. last week</h3><p class="fine">For '+esc(profile.name||'this profile')+' · Actual recorded time only. Plans and repeating schedules are not counted until recorded.</p><p class="fine"><strong>Selected week: '+period(c.fullDates)+'</strong>'+(c.fullDates[6]>=today?' · '+(c.days?'in progress':'not started'):'')+'<br><strong>Previous full week: '+period(c.previousFullDates)+'</strong><br>Days with entries: '+c.currentCoverage+'/'+c.days+' elapsed days in the selected week; '+c.previousFullCoverage+'/7 in the previous week.</p>'+table()+'<p class="fine">Previous full week includes Monday–Sunday, even when this week is still underway. Missing days are unknown; 0m means no time for that activity in the available logs. Full-week changes require two finished weeks with entries on all seven days.</p>'+(c.days>0&&c.days<7?'<details><summary>Compare the same weekdays instead</summary><p class="fine">'+period(c.dates)+' compared with '+period(c.previousDates)+'. Today may still be incomplete. '+c.currentCoverage+'/'+c.days+' days logged vs. '+c.previousCoverage+'/'+c.days+'.</p>'+table(true)+'</details>':'')+'</section>';
 }
 export function weeklyInsights(data, profile, selected, today=dateKey()) {
   const dates=rangeDates(selected,'week'), start=dates[0];
