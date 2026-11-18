@@ -64,5 +64,12 @@ The weekly insight panel follows the week containing the selected date, includin
 The uploaded weekday example is described as an illustration, not multiplied into a prescribed weekly schedule. [CDC sleep guidance](https://www.cdc.gov/sleep/about/) gives 9–12 hours for ages 6–12 and 8–10 for ages 13–17. The app links to the [AAP family media plan](https://www.healthychildren.org/English/family-life/Media/Pages/How-to-Make-a-Family-Media-Use-Plan.aspx) so families can choose screen habits together.
 # Weekly email reports
 
+## Smarter planning
+
+- **Repeating schedule** on the dashboard provides School (Mon–Fri), Sleep (daily), and Practice shortcuts, custom weekdays, start/end times, and an optional last date. Overnight durations belong to the starting date. These are plans, not automatic actual logs.
+- In **My day → My plan**, use **Complete as planned** for today or an earlier date. The plan stays available for comparison; the recorded entry can be adjusted in **What happened**. Completion uses a stable entry ID to prevent repeated taps and synced copies from creating duplicate completions. Manually logged copies of the same activity prompt you to review the existing entry.
+- **This week vs. last week** compares matching elapsed weekdays. Differences appear only when both periods have entries on every compared day; the app still cannot know whether each day is fully logged.
+- To skip a holiday, remove that individual planned occurrence. To end a schedule, open an occurrence and choose **Stop repeating this plan**.
+
 Monday reports can run on Firebase Spark using a private Google Apps Script sender. The app's **Account → Weekly email report** screen saves each verified parent's opt-in. Delivery remains pending until the owner authorizes and installs the script. See [setup instructions](WEEKLY_EMAIL_SETUP.md).
 

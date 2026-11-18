@@ -8,6 +8,21 @@ export function timeBalance(actual, planned, days) {
   const capacity=days*1440, recorded=totals(actual), scheduled=totals(planned);
   return {capacity,recorded,scheduled,unknown:Math.max(0,capacity-recorded),available:Math.max(0,capacity-scheduled),actualOver:Math.max(0,recorded-capacity),planOver:Math.max(0,scheduled-capacity)};
 }
+export function previousWeekComparison(data,profile,selected,today=dateKey()){
+  const dates=rangeDates(selected,'week').filter(d=>d<=today),previous=dates.map(d=>shiftDate(d,-7));
+  const rows=live(data.entries).filter(e=>e.profileId===profile.id&&e.kind==='actual'&&e.date<=today);
+  const current=rows.filter(e=>dates.includes(e.date)),prior=rows.filter(e=>previous.includes(e.date));
+  const coverage=items=>new Set(items.map(e=>e.date)).size;
+  const activities=data.activities.filter(a=>a.profileId===profile.id),byId=new Map(activities.map(a=>[a.id,a]));
+  const measures=[{name:'Total recorded',sum:totals},{name:'Screen time',sum:xs=>totals(xs.filter(e=>isScreen(byId.get(e.activityId))))},...activities.filter(a=>!a.deleted).map(a=>({name:a.name,sum:xs=>totals(xs.filter(e=>e.activityId===a.id))}))];
+  return {days:dates.length,currentCoverage:coverage(current),previousCoverage:coverage(prior),comparable:dates.length>0&&coverage(current)===dates.length&&coverage(prior)===dates.length,
+    rows:measures.map(m=>({name:m.name,current:m.sum(current),previous:m.sum(prior),delta:m.sum(current)-m.sum(prior)})).filter((r,i)=>i<2||r.current||r.previous)};
+}
+function previousWeekView(data,profile,date){
+  const c=previousWeekComparison(data,profile,date);
+  if(!c.days)return '<section class="week-comparison"><h3>This week vs. last week</h3><p class="fine">This week has not started yet. Recorded comparisons appear when it begins.</p></section>';
+  return `<section class="week-comparison"><h3>This week vs. last week</h3><p class="fine">Matching ${c.days} weekday${c.days===1?'':'s'} · ${c.currentCoverage}/${c.days} days logged this week; ${c.previousCoverage}/${c.days} last week. ${c.days<7?'Today may still be incomplete.':''}</p>${c.comparable?'':'<p class="fine">Missing days are unknown. Changes will appear once both periods have entries on every compared day.</p>'}<div class="comparison-scroll"><table><thead><tr><th>Activity</th><th>This week</th><th>Last week</th><th>Change</th></tr></thead><tbody>${c.rows.map(r=>`<tr><th>${esc(r.name)}</th><td>${duration(r.current)}</td><td>${duration(r.previous)}</td><td>${c.comparable?(r.delta===0?'Same':`${r.delta>0?'↑':'↓'} ${duration(Math.abs(r.delta))}`):'Incomplete'}</td></tr>`).join('')}</tbody></table></div><p class="fine">Totals reflect logged time only. More or less time is a conversation starter, not a score.</p></section>`;
+}
 export function weeklyInsights(data, profile, selected, today=dateKey()) {
   const dates=rangeDates(selected,'week'), start=dates[0];
   const activities=data.activities.filter(a=>a.profileId===profile.id);
@@ -56,7 +71,7 @@ export function remainingView(actual,planned,days) {
 export function insightsView(data,profile,date) {
   const s=weeklyInsights(data,profile,date), allocated=s.categories.reduce((n,c)=>n+c.target,0);
   return `<section class="card insights-card"><div class="card-title"><div><div class="eyebrow">NOTICE YOUR PATTERNS</div><h2>Weekly balance & trends</h2><p>${short(s.start)} – ${short(s.dates[6])} · Actual time</p></div><button class="secondary" data-action="time-targets">Targets & screens</button></div>
-    <p class="fine">${s.coverage} of ${s.elapsed} elapsed days have entries · ${duration(s.balance.recorded)} recorded out of 168h. Gaps are unknown; logging more can change the trend.</p>
+    ${previousWeekView(data,profile,date)}<p class="fine">${s.coverage} of ${s.elapsed} elapsed days have entries · ${duration(s.balance.recorded)} recorded out of 168h. Gaps are unknown; logging more can change the trend.</p>
     <div class="screen-summary"><strong>${duration(s.screen)} of screen time</strong><span>${Number.isFinite(s.limit)?s.screen>s.limit?`${duration(s.screen-s.limit)} above your limit`:`${duration(s.limit-s.screen)} left within your ${duration(s.limit)} weekly limit`:'Set a family screen limit to see hours remaining.'}</span></div>
     ${s.flags.length?`<ul class="insight-flags">${s.flags.map(f=>`<li>${esc(f)}</li>`).join('')}</ul>`:'<p class="fine">No limits or unusual increases flagged in the recorded time.</p>'}
     <div class="insight-columns"><div><h3>Your weekly distribution</h3><p class="fine">Recorded / chosen weekly target. Targets do not add activities to your calendar.</p>${s.categories.map(c=>`<div class="budget-row"><div><span>${esc(c.name)}</span><b>${duration(c.minutes)} / ${c.target?duration(c.target):'not set'}</b></div><div class="budget-track"><i style="width:${Math.min(100,c.minutes/(c.target||10080)*100)}%;background:${c.color}"></i></div></div>`).join('')}<p class="fine">${duration(allocated)} of 168h assigned to targets · ${duration(Math.max(0,10080-allocated))} left to allocate.</p></div>
