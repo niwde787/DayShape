@@ -79,7 +79,8 @@ var DayShapeEmail = (() => {
     return /\b(video games?|gaming|screen time|tv|television|youtube|tiktok|social media)\b/i.test(activity?.name || "");
   }
   function isScreen(activity) {
-    return typeof activity?.screenTime === "boolean" ? activity.screenTime : suggestedScreen(activity);
+    if (activity?.screenTagVersion === 2 && typeof activity.screenTime === "boolean") return activity.screenTime;
+    return activity?.screenTime === true || suggestedScreen(activity);
   }
   function timeBalance(actual, planned, days) {
     const capacity = days * 1440, recorded = totals(actual), scheduled = totals(planned);

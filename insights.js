@@ -5,7 +5,10 @@ export function suggestedScreen(activity) {
   return /\b(video games?|gaming|screen time|tv|television|youtube|tiktok|social media)\b/i.test(activity?.name || '');
 }
 export function isScreen(activity) {
-  return typeof activity?.screenTime === 'boolean' ? activity.screenTime : suggestedScreen(activity);
+  // Older target forms saved false for every unchecked activity, including defaults.
+  // Only exclusions reviewed with the current screen controls override automatic detection.
+  if(activity?.screenTagVersion===2 && typeof activity.screenTime==='boolean') return activity.screenTime;
+  return activity?.screenTime===true || suggestedScreen(activity);
 }
 export function timeBalance(actual, planned, days) {
   const capacity=days*1440, recorded=totals(actual), scheduled=totals(planned);
@@ -96,7 +99,7 @@ export function insightsView(data,profile,date) {
 
 export function targetsModal({data,profile,modal,close,changed,getData=()=>data}) {
   const acts=live(data.activities).filter(a=>a.profileId===profile.id), targets=profile.timeTargets||{};
-  modal(`<div class="eyebrow">MAKE ROOM TOGETHER</div><h2>Weekly targets & screens</h2><p>Choose a repeatable weekly budget for ${esc(profile.name)}. Leave category targets at zero to keep them unset.</p><form id="time-target-form"><div class="target-fields">${categories.map(c=>`<label>${esc(c.name)} (hours)<input type="number" name="budget-${c.id}" min="0" max="168" step="0.25" value="${Number(targets.categories?.[c.id]||0)/60}"></label>`).join('')}</div><output id="budget-remaining" aria-live="polite"></output><label>Screen limit per week (hours)<input name="screen-limit" type="number" min="0" max="168" step="0.25" placeholder="No limit set" value="${Number.isFinite(targets.screenMinutes)?targets.screenMinutes/60:''}"></label><p class="fine">Blank means no screen limit. Zero means no screen time planned. Screen time is already part of the categories above, so it is not added to the 168h budget again.</p><fieldset><legend>Which activities count as screen time?</legend><p class="fine">Checked activities contribute to screen totals, trends, and flags. Changes apply to past entries too. If you record a combined screen-time total, avoid also logging the same minutes under games or YouTube.</p><button type="button" class="secondary" id="suggest-screen-tags">Include suggested screen activities</button><p id="screen-tag-status" class="fine" aria-live="polite"></p>${acts.map(a=>`<label class="screen-choice"><input type="checkbox" name="screen-activity" value="${esc(a.id)}" ${isScreen(a)?'checked':''}>${esc(a.name)}</label>`).join('')}</fieldset><p class="form-error" id="target-error" role="alert"></p><button class="primary full">Save weekly targets</button></form>`);
+  modal(`<div class="eyebrow">MAKE ROOM TOGETHER</div><h2>Weekly targets & screens</h2><p>Choose a repeatable weekly budget for ${esc(profile.name)}. Leave category targets at zero to keep them unset.</p><form id="time-target-form"><div class="target-fields">${categories.map(c=>`<label>${esc(c.name)} (hours)<input type="number" name="budget-${c.id}" min="0" max="168" step="0.25" value="${Number(targets.categories?.[c.id]||0)/60}"></label>`).join('')}</div><output id="budget-remaining" aria-live="polite"></output><label>Screen limit per week (hours)<input name="screen-limit" type="number" min="0" max="168" step="0.25" placeholder="No limit set" value="${Number.isFinite(targets.screenMinutes)?targets.screenMinutes/60:''}"></label><p class="fine">Blank means no screen limit. Zero means no screen time planned. Screen time is already part of the categories above, so it is not added to the 168h budget again.</p><fieldset><legend>Which activities count as screen time?</legend><p class="fine">Video games, Screen time, and YouTube count automatically, including past entries. You can uncheck an activity and save to exclude it. Checked activities contribute to screen totals, trends, and flags. Changes apply to past entries too. If you record a combined screen-time total, avoid also logging the same minutes under games or YouTube.</p><button type="button" class="secondary" id="suggest-screen-tags">Include suggested screen activities</button><p id="screen-tag-status" class="fine" aria-live="polite"></p>${acts.map(a=>`<label class="screen-choice"><input type="checkbox" name="screen-activity" value="${esc(a.id)}" ${isScreen(a)?'checked':''}>${esc(a.name)}</label>`).join('')}</fieldset><p class="form-error" id="target-error" role="alert"></p><button class="primary full">Save weekly targets</button></form>`);
   const form=document.querySelector('#time-target-form');
   const choices=[...form.querySelectorAll('[name="screen-activity"]')];
   const tagStatus=()=>{const count=choices.filter(c=>c.checked).length;form.querySelector('#screen-tag-status').textContent=count?count+' activities included in screen totals. Save to apply changes.':'No activities selected: screen totals will show 0m, even if screen activities have recorded hours.';};
@@ -113,7 +116,7 @@ export function targetsModal({data,profile,modal,close,changed,getData=()=>data}
     const now=new Date().toISOString();current.timeTargets={categories,screenMinutes};current.updatedAt=now;
     const tagged=new Set(new FormData(form).getAll('screen-activity'));
     const shown=new Set(acts.map(a=>a.id));
-    for(const a of live(latest.activities).filter(a=>a.profileId===profile.id&&shown.has(a.id))) if(a.screenTime!==tagged.has(a.id)){a.screenTime=tagged.has(a.id);a.updatedAt=now;}
+    for(const a of live(latest.activities).filter(a=>a.profileId===profile.id&&shown.has(a.id))) if(a.screenTime!==tagged.has(a.id)||a.screenTagVersion!==2){a.screenTime=tagged.has(a.id);a.screenTagVersion=2;a.updatedAt=now;}
     close();changed();
   };
 }

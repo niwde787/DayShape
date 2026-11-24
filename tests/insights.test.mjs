@@ -10,9 +10,10 @@ test('remaining time separates actual from plan and reports excess',()=>{
   assert.equal(b.unknown,840);assert.equal(b.available,540);
   assert.equal(timeBalance([], [{minutes:1600}],1).planOver,160);
 });
-test('screen tags are independent of category and explicit false overrides name inference',()=>{
+test('legacy unchecked tags recover automatically; reviewed exclusions override detection',()=>{
   assert.equal(isScreen({name:'Video games'}),true);
-  assert.equal(isScreen({name:'Video games',screenTime:false}),false);
+  assert.equal(isScreen({name:'Video games',screenTime:false}),true);
+  assert.equal(isScreen({name:'Video games',screenTime:false,screenTagVersion:2}),false);
   assert.equal(isScreen({name:'Board games',category:'play'}),false);
   assert.equal(isScreen({name:'Homework',screenTime:true}),true);
 });
@@ -35,22 +36,23 @@ test('activity maximum goals flag individually and zero screen limit is supporte
 });
 
 
-test('excluded screen activities are explained and restoring suggestions repairs both weeks',()=>{
+test('legacy screen activities contribute to both weeks automatically and exclusions remain editable',()=>{
   const window=new Window(),old={document:globalThis.document,FormData:globalThis.FormData};
   globalThis.document=window.document;globalThis.FormData=window.FormData;
   try {
     const d=data();d.activities=[{id:'game',profileId:'p',name:'Video games',screenTime:false},{id:'phone',profileId:'p',name:'Screen time',screenTime:false},{id:'yt',profileId:'p',name:'YouTube',screenTime:false},{id:'school',profileId:'p',name:'School',screenTime:true}];
     d.entries=[entry('2026-11-23',150),entry('2026-11-23',105,{id:'phone-now',activityId:'phone'}),entry('2026-11-16',907),entry('2026-11-16',1515,{id:'phone-before',activityId:'phone'}),entry('2026-11-16',420,{id:'yt-before',activityId:'yt'})];
     const original=JSON.stringify(d.entries);
-    assert.equal(previousWeekComparison(d,profile,'2026-11-23','2026-11-23').rows[1].current,0);
-    assert.match(previousWeekView(d,profile,'2026-11-23','2026-11-23'),/Excluded from screen totals: Video games, Screen time, YouTube/);
+    assert.equal(previousWeekComparison(d,profile,'2026-11-23','2026-11-23').rows[1].current,255);
+    assert.equal(previousWeekComparison(d,profile,'2026-11-23','2026-11-23').rows[1].previousFull,2842);
+    assert.match(previousWeekView(d,profile,'2026-11-23','2026-11-23'),/Video games, Screen time, YouTube, School/);
     let saved=0;
     targetsModal({data:d,profile,modal:html=>window.document.body.innerHTML=html,close(){},changed(){saved++;}});
     window.document.querySelector('#suggest-screen-tags').click();
     assert.ok(window.document.querySelector('[value="school"]').checked,'retain custom screen selections');
     assert.equal(d.activities[0].screenTime,false,'suggestions do not save until submitted');
     window.document.querySelector('#time-target-form').dispatchEvent(new window.Event('submit',{cancelable:true}));
-    assert.equal(saved,1);
+    assert.equal(saved,1);assert.equal(d.activities[0].screenTagVersion,2);
     const c=previousWeekComparison(d,profile,'2026-11-23','2026-11-23');
     assert.equal(c.rows[1].name,'Screen time total (tagged activities)');
     assert.equal(c.rows[1].current,255);assert.equal(c.rows[1].previousFull,2842);
@@ -58,5 +60,9 @@ test('excluded screen activities are explained and restoring suggestions repairs
     assert.equal(weeklyInsights(d,profile,'2026-11-23','2026-11-23').screen,255);
     assert.equal(JSON.stringify(d.entries),original);
     assert.doesNotMatch(previousWeekView(d,profile,'2026-11-23','2026-11-23'),/Excluded from screen totals:/);
+    window.document.querySelector('[value=game]').checked=false;
+    window.document.querySelector('#time-target-form').dispatchEvent(new window.Event('submit',{cancelable:true}));
+    assert.equal(previousWeekComparison(d,profile,'2026-11-23','2026-11-23').rows[1].current,105);
+    assert.equal(isScreen(JSON.parse(JSON.stringify(d.activities[0]))),false,'reviewed exclusion survives reload');
   } finally {window.happyDOM.abort();globalThis.document=old.document;globalThis.FormData=old.FormData;}
 });

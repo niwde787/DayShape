@@ -32,7 +32,7 @@ test('quiet hours, disabled choices and missing data produce no notifications',(
   assert.deepEqual(dueMessages(settings,[{...profile,value:{...profile.value,deleted:true}},activity,row('2026-11-11')],new Date('2026-11-11T23:00:00Z')),[]);
 });
 test('screen tag overrides inference and max goals flag independently',()=>{
-  const records=[profile,{...activity,value:{...activity.value,screenTime:false}},row('2026-11-11'),{kind:'goals',value:{profileId:'p',activityId:'game',week:'2026-11-09',direction:'max',minutes:30}}];
+  const records=[profile,{...activity,value:{...activity.value,screenTime:false,screenTagVersion:2}},row('2026-11-11'),{kind:'goals',value:{profileId:'p',activityId:'game',week:'2026-11-09',direction:'max',minutes:30}}];
   const r=report(records,'p','2026-11-09','2026-11-11');assert.equal(r.screen,0);assert.equal(r.flags.length,1);assert.match(r.flags[0],/1.5h above its goal/);
 });
 test('repeated scheduler evaluations generate stable weekly deduplication keys',()=>{
@@ -40,3 +40,5 @@ test('repeated scheduler evaluations generate stable weekly deduplication keys',
   const a=dueMessages(settings,records,new Date('2026-11-11T23:00:00Z')),b=dueMessages(settings,records,new Date('2026-11-11T23:15:00Z'));
   assert.deepEqual(a.map(m=>m.key),b.map(m=>m.key));
 });
+
+test('legacy unchecked screen activity counts in reports automatically',()=>{const r=report([profile,{...activity,value:{...activity.value,screenTime:false}},row('2026-11-11')],'p','2026-11-09','2026-11-11');assert.equal(r.screen,120);});

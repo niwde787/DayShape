@@ -15,7 +15,7 @@ export function report(records,profileId,start,end){
   if(!profile)return null;
   const rows=data.filter(r=>r.kind==='entries'&&r.value.profileId===profileId&&r.value.kind==='actual'&&r.value.date>=start&&r.value.date<=end).map(r=>r.value);
   const activities=new Map(data.filter(r=>r.kind==='activities'&&r.value.profileId===profileId).map(r=>[r.value.id,r.value]));
-  const sum=rows=>rows.reduce((n,e)=>n+e.minutes,0),screen=sum(rows.filter(e=>{const a=activities.get(e.activityId);return typeof a?.screenTime==='boolean'?a.screenTime:/\b(video games?|gaming|screen time|tv|television|youtube|tiktok|social media)\b/i.test(a?.name||'');}));
+  const sum=rows=>rows.reduce((n,e)=>n+e.minutes,0),screen=sum(rows.filter(e=>{const a=activities.get(e.activityId);return a?.screenTagVersion===2&&typeof a.screenTime==='boolean'?a.screenTime:a?.screenTime===true||/\b(video games?|gaming|screen time|tv|television|youtube|tiktok|social media)\b/i.test(a?.name||'');}));
   const flags=[],limit=profile.timeTargets?.screenMinutes;
   if(Number.isFinite(limit)&&screen>limit)flags.push(`screen time ${hours(screen-limit)} above your weekly limit`);
   for(const {value:g} of data.filter(r=>r.kind==='goals'&&r.value.profileId===profileId&&r.value.week===start&&r.value.direction==='max')){const spent=sum(rows.filter(e=>e.activityId===g.activityId));if(spent>g.minutes)flags.push(`${activities.get(g.activityId)?.name||'Activity'} ${hours(spent-g.minutes)} above its goal`);}
