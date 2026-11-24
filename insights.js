@@ -1,8 +1,11 @@
 import {categories, dateKey, rangeDates, shiftDate, live, totals, duration, routineEntries} from './domain.js';
 
 // A tag is independent of category: leisure is not necessarily screen time.
+export function suggestedScreen(activity) {
+  return /\b(video games?|gaming|screen time|tv|television|youtube|tiktok|social media)\b/i.test(activity?.name || '');
+}
 export function isScreen(activity) {
-  return typeof activity?.screenTime === 'boolean' ? activity.screenTime : /\b(video games?|gaming|screen time|tv|television|youtube|tiktok|social media)\b/i.test(activity?.name || '');
+  return typeof activity?.screenTime === 'boolean' ? activity.screenTime : suggestedScreen(activity);
 }
 export function timeBalance(actual, planned, days) {
   const capacity=days*1440, recorded=totals(actual), scheduled=totals(planned);
@@ -15,9 +18,14 @@ export function previousWeekComparison(data,profile,selected,today=dateKey()){
   const current=rows.filter(e=>dates.includes(e.date)),prior=rows.filter(e=>previous.includes(e.date)),priorFull=rows.filter(e=>previousFullDates.includes(e.date));
   const coverage=items=>new Set(items.map(e=>e.date)).size;
   const activities=data.activities.filter(a=>a.profileId===profile.id),byId=new Map(activities.map(a=>[a.id,a]));
-  const measures=[{name:'Total recorded',sum:totals},{name:'Screen time',sum:xs=>totals(xs.filter(e=>isScreen(byId.get(e.activityId))))},...activities.filter(a=>!a.deleted).map(a=>({name:a.name,sum:xs=>totals(xs.filter(e=>e.activityId===a.id))}))];
+  const measures=[{name:'Total recorded',sum:totals},{name:'Screen time total (tagged activities)',sum:xs=>totals(xs.filter(e=>isScreen(byId.get(e.activityId))))},...activities.filter(a=>!a.deleted).map(a=>({name:a.name,sum:xs=>totals(xs.filter(e=>e.activityId===a.id))}))];
   return {dates,previousDates:previous,fullDates,previousFullDates,previousFullCoverage:coverage(priorFull),days:dates.length,currentCoverage:coverage(current),previousCoverage:coverage(prior),comparable:dates.length>0&&coverage(current)===dates.length&&coverage(prior)===dates.length,
     rows:measures.map(m=>({name:m.name,current:m.sum(current),previous:m.sum(prior),previousFull:m.sum(priorFull),delta:m.sum(current)-m.sum(prior)})).filter((r,i)=>i<2||r.current||r.previous||r.previousFull)};
+}
+export function screenTagReview(data,profile) {
+  const activities=data.activities.filter(a=>a.profileId===profile.id&&!a.deleted);
+  const included=activities.filter(isScreen), excluded=activities.filter(a=>suggestedScreen(a)&&!isScreen(a));
+  return '<div class="screen-tag-review"><p class="fine"><strong>Screen total includes:</strong> '+(included.length?included.map(a=>esc(a.name)).join(', '):'No activities selected')+'. Each recorded entry is counted once in this total; the total is already part of Total recorded.</p>'+(excluded.length?'<p class="insight-flag">Excluded from screen totals: '+excluded.map(a=>esc(a.name)).join(', ')+'. Their recorded hours still appear in the activity rows. Review the saved screen tags to include them.</p>':'')+'<button class="secondary" data-action="time-targets">Review screen activities</button></div>';
 }
 export function previousWeekView(data,profile,date,today=dateKey()){
   const c=previousWeekComparison(data,profile,date,today);
@@ -26,7 +34,7 @@ export function previousWeekView(data,profile,date,today=dateKey()){
   const fullComparable=c.days===7&&c.fullDates[6]<today&&c.comparable;
   const change=r=>fullComparable?(r.delta===0?'Same':(r.delta>0?'↑ ':'↓ ')+duration(Math.abs(r.delta))):c.fullDates[6]>=today?'Week not finished':'Incomplete logging';
   const table=(matched=false)=>'<div class="comparison-scroll"><table><thead><tr><th>Activity</th><th>Selected '+(matched?'weekdays':'week so far')+'</th><th>'+(matched?'Previous matching weekdays':'Previous full week')+'</th><th>Change</th></tr></thead><tbody>'+c.rows.map(r=>'<tr><th>'+esc(r.name)+'</th><td>'+label(r.current,c.currentCoverage)+'</td><td>'+label(matched?r.previous:r.previousFull,matched?c.previousCoverage:c.previousFullCoverage)+'</td><td>'+(matched?(c.comparable?(r.delta===0?'Same':(r.delta>0?'↑ ':'↓ ')+duration(Math.abs(r.delta))):'Incomplete logging'):change(r))+'</td></tr>').join('')+'</tbody></table></div>';
-  return '<section class="week-comparison"><h3>This week vs. last week</h3><p class="fine">For '+esc(profile.name||'this profile')+' · Actual recorded time only. Plans and repeating schedules are not counted until recorded.</p><p class="fine"><strong>Selected week: '+period(c.fullDates)+'</strong>'+(c.fullDates[6]>=today?' · '+(c.days?'in progress':'not started'):'')+'<br><strong>Previous full week: '+period(c.previousFullDates)+'</strong><br>Days with entries: '+c.currentCoverage+'/'+c.days+' elapsed days in the selected week; '+c.previousFullCoverage+'/7 in the previous week.</p>'+table()+'<p class="fine">Previous full week includes Monday–Sunday, even when this week is still underway. Missing days are unknown; 0m means no time for that activity in the available logs. Full-week changes require two finished weeks with entries on all seven days.</p>'+(c.days>0&&c.days<7?'<details><summary>Compare the same weekdays instead</summary><p class="fine">'+period(c.dates)+' compared with '+period(c.previousDates)+'. Today may still be incomplete. '+c.currentCoverage+'/'+c.days+' days logged vs. '+c.previousCoverage+'/'+c.days+'.</p>'+table(true)+'</details>':'')+'</section>';
+  return '<section class="week-comparison"><h3>This week vs. last week</h3><p class="fine">For '+esc(profile.name||'this profile')+' · Actual recorded time only. Plans and repeating schedules are not counted until recorded.</p><p class="fine"><strong>Selected week: '+period(c.fullDates)+'</strong>'+(c.fullDates[6]>=today?' · '+(c.days?'in progress':'not started'):'')+'<br><strong>Previous full week: '+period(c.previousFullDates)+'</strong><br>Days with entries: '+c.currentCoverage+'/'+c.days+' elapsed days in the selected week; '+c.previousFullCoverage+'/7 in the previous week.</p>'+table()+screenTagReview(data,profile)+'<p class="fine">Previous full week includes Monday–Sunday, even when this week is still underway. Missing days are unknown; 0m means no time for that activity in the available logs. Full-week changes require two finished weeks with entries on all seven days.</p>'+(c.days>0&&c.days<7?'<details><summary>Compare the same weekdays instead</summary><p class="fine">'+period(c.dates)+' compared with '+period(c.previousDates)+'. Today may still be incomplete. '+c.currentCoverage+'/'+c.days+' days logged vs. '+c.previousCoverage+'/'+c.days+'.</p>'+table(true)+'</details>':'')+'</section>';
 }
 export function weeklyInsights(data, profile, selected, today=dateKey()) {
   const dates=rangeDates(selected,'week'), start=dates[0];
@@ -52,7 +60,7 @@ export function weeklyInsights(data, profile, selected, today=dateKey()) {
     const rows=all.filter(e=>previousDates.includes(e.date));
     if(previousDates.every(d=>rows.some(e=>e.date===d))) baseline.push(rows);
   }
-  const measures=[{name:'Screen time',sum:screenTotal},...activities.filter(a=>!a.deleted).map(a=>({name:a.name,sum:rows=>totals(rows.filter(e=>e.activityId===a.id))}))];
+  const measures=[{name:'Screen time total',sum:screenTotal},...activities.filter(a=>!a.deleted).map(a=>({name:a.name,sum:rows=>totals(rows.filter(e=>e.activityId===a.id))}))];
   const changes=baseline.length>=2?measures.map(m=>{
     const current=m.sum(actual), average=baseline.reduce((n,rows)=>n+m.sum(rows),0)/baseline.length;
     return {name:m.name,current,average,delta:current-average};
@@ -88,8 +96,12 @@ export function insightsView(data,profile,date) {
 
 export function targetsModal({data,profile,modal,close,changed,getData=()=>data}) {
   const acts=live(data.activities).filter(a=>a.profileId===profile.id), targets=profile.timeTargets||{};
-  modal(`<div class="eyebrow">MAKE ROOM TOGETHER</div><h2>Weekly targets & screens</h2><p>Choose a repeatable weekly budget for ${esc(profile.name)}. Leave category targets at zero to keep them unset.</p><form id="time-target-form"><div class="target-fields">${categories.map(c=>`<label>${esc(c.name)} (hours)<input type="number" name="budget-${c.id}" min="0" max="168" step="0.25" value="${Number(targets.categories?.[c.id]||0)/60}"></label>`).join('')}</div><output id="budget-remaining" aria-live="polite"></output><label>Screen limit per week (hours)<input name="screen-limit" type="number" min="0" max="168" step="0.25" placeholder="No limit set" value="${Number.isFinite(targets.screenMinutes)?targets.screenMinutes/60:''}"></label><p class="fine">Blank means no screen limit. Zero means no screen time planned. Screen time is already part of the categories above, so it is not added to the 168h budget again.</p><fieldset><legend>Which activities count as screen time?</legend><p class="fine">Obvious screen activities are suggested. Review these tags; changes apply to past entries too. Schoolwork on a screen can be included or excluded to match your family’s limit.</p>${acts.map(a=>`<label class="screen-choice"><input type="checkbox" name="screen-activity" value="${esc(a.id)}" ${isScreen(a)?'checked':''}>${esc(a.name)}</label>`).join('')}</fieldset><p class="form-error" id="target-error" role="alert"></p><button class="primary full">Save weekly targets</button></form>`);
+  modal(`<div class="eyebrow">MAKE ROOM TOGETHER</div><h2>Weekly targets & screens</h2><p>Choose a repeatable weekly budget for ${esc(profile.name)}. Leave category targets at zero to keep them unset.</p><form id="time-target-form"><div class="target-fields">${categories.map(c=>`<label>${esc(c.name)} (hours)<input type="number" name="budget-${c.id}" min="0" max="168" step="0.25" value="${Number(targets.categories?.[c.id]||0)/60}"></label>`).join('')}</div><output id="budget-remaining" aria-live="polite"></output><label>Screen limit per week (hours)<input name="screen-limit" type="number" min="0" max="168" step="0.25" placeholder="No limit set" value="${Number.isFinite(targets.screenMinutes)?targets.screenMinutes/60:''}"></label><p class="fine">Blank means no screen limit. Zero means no screen time planned. Screen time is already part of the categories above, so it is not added to the 168h budget again.</p><fieldset><legend>Which activities count as screen time?</legend><p class="fine">Checked activities contribute to screen totals, trends, and flags. Changes apply to past entries too. If you record a combined screen-time total, avoid also logging the same minutes under games or YouTube.</p><button type="button" class="secondary" id="suggest-screen-tags">Include suggested screen activities</button><p id="screen-tag-status" class="fine" aria-live="polite"></p>${acts.map(a=>`<label class="screen-choice"><input type="checkbox" name="screen-activity" value="${esc(a.id)}" ${isScreen(a)?'checked':''}>${esc(a.name)}</label>`).join('')}</fieldset><p class="form-error" id="target-error" role="alert"></p><button class="primary full">Save weekly targets</button></form>`);
   const form=document.querySelector('#time-target-form');
+  const choices=[...form.querySelectorAll('[name="screen-activity"]')];
+  const tagStatus=()=>{const count=choices.filter(c=>c.checked).length;form.querySelector('#screen-tag-status').textContent=count?count+' activities included in screen totals. Save to apply changes.':'No activities selected: screen totals will show 0m, even if screen activities have recorded hours.';};
+  form.querySelector('#suggest-screen-tags').onclick=()=>{const ids=new Set(acts.filter(suggestedScreen).map(a=>a.id));for(const choice of choices)if(ids.has(choice.value))choice.checked=true;tagStatus();};
+  form.addEventListener('change',tagStatus);tagStatus();
   const values=()=>Object.fromEntries(categories.map(c=>[c.id,Number(form.elements[`budget-${c.id}`].value)*60]));
   const update=()=>{const n=Object.values(values()).reduce((n,v)=>n+v,0);document.querySelector('#budget-remaining').textContent=n<=10080?`${duration(10080-n)} of 168h left to allocate`:`${duration(n-10080)} over the 168h weekly budget`;};
   form.addEventListener('input',update);update();

@@ -75,8 +75,11 @@ var DayShapeEmail = (() => {
   }
 
   // insights.js
+  function suggestedScreen(activity) {
+    return /\b(video games?|gaming|screen time|tv|television|youtube|tiktok|social media)\b/i.test(activity?.name || "");
+  }
   function isScreen(activity) {
-    return typeof activity?.screenTime === "boolean" ? activity.screenTime : /\b(video games?|gaming|screen time|tv|television|youtube|tiktok|social media)\b/i.test(activity?.name || "");
+    return typeof activity?.screenTime === "boolean" ? activity.screenTime : suggestedScreen(activity);
   }
   function timeBalance(actual, planned, days) {
     const capacity = days * 1440, recorded = totals(actual), scheduled = totals(planned);
@@ -104,7 +107,7 @@ var DayShapeEmail = (() => {
       const rows = all.filter((e) => previousDates.includes(e.date));
       if (previousDates.every((d) => rows.some((e) => e.date === d))) baseline.push(rows);
     }
-    const measures = [{ name: "Screen time", sum: screenTotal }, ...activities.filter((a) => !a.deleted).map((a) => ({ name: a.name, sum: (rows) => totals(rows.filter((e) => e.activityId === a.id)) }))];
+    const measures = [{ name: "Screen time total", sum: screenTotal }, ...activities.filter((a) => !a.deleted).map((a) => ({ name: a.name, sum: (rows) => totals(rows.filter((e) => e.activityId === a.id)) }))];
     const changes = baseline.length >= 2 ? measures.map((m) => {
       const current = m.sum(actual), average = baseline.reduce((n, rows) => n + m.sum(rows), 0) / baseline.length;
       return { name: m.name, current, average, delta: current - average };
