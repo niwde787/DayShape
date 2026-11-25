@@ -57,6 +57,7 @@ test('unconfigured cloud keeps local onboarding, activity logging, and setup acc
     assert.equal(doc.querySelector('[name="screen-limit"]').value,'7');
     doc.querySelector('[data-action="close"]').click();
     doc.querySelector('[data-action="add"]').click();
+    assert.equal(doc.querySelector('#activity-select').options[0].value,practice.id,'most logged activity is offered first');
     doc.querySelector('#entry-form [name=hours]').value='24';
     doc.querySelector('#entry-form').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));
     assert.match(doc.querySelector('#entry-error').textContent,/no more than 24 hours/);

@@ -31,3 +31,17 @@ export function removeProfileData(data,profileId,updatedAt=new Date().toISOStrin
 export function totals(entries){return entries.reduce((n,e)=>n+e.minutes,0);}
 export function validateMinutes(value,others){return Number.isInteger(value)&&value>0&&value<=1440&&totals(others)+value<=1440;}
 export function routineEntries(data,profileId,date){const weekday=new Date(date+'T12:00:00').getDay();return live(data.routines).filter(r=>r.profileId===profileId&&r.days.includes(weekday)&&date>=r.startDate&&(!r.endDate||date<=r.endDate)).filter(r=>!data.entries.some(e=>e.routineId===r.id&&e.date===date)).map(r=>({...r,id:`${r.id}:${date}`,routineId:r.id,date,kind:'plan',virtual:true}));}
+
+// Rank by logging frequency, not hours; keep unused activities in their original order.
+export function rankedActivities(data,profileId,today=dateKey()) {
+  const usage=new Map();
+  for(const e of live(data.entries)) {
+    if(e.profileId!==profileId||e.kind!=='actual'||e.date>today)continue;
+    const stat=usage.get(e.activityId)||{count:0,last:''};
+    stat.count++;if(e.date>stat.last)stat.last=e.date;usage.set(e.activityId,stat);
+  }
+  return live(data.activities).filter(a=>a.profileId===profileId).sort((a,b)=>{
+    const x=usage.get(a.id)||{count:0,last:''},y=usage.get(b.id)||{count:0,last:''};
+    return y.count-x.count||y.last.localeCompare(x.last);
+  });
+}
