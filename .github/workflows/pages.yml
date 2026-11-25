@@ -55,6 +55,8 @@ jobs:
           exit 1
       - name: Deploy
         id: deployment
-        uses: actions/deploy-pages@v4
+        # Pin the official REST-based release: the newer artifact-service lookup
+        # returns no artifacts even when the run-scoped REST API finds the upload.
+        uses: actions/deploy-pages@f33f41b675f0ab2dc5a6863c9a170fe83af3571e # v4.0.0
         with:
           artifact_name: pages-${{ github.run_id }}-${{ github.run_attempt }}
