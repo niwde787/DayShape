@@ -1,15 +1,17 @@
+import {insightsView,targetsModal} from './insights.js';
+import {dateKey,live} from './domain.js';
 import {accountPanel,accessRows} from './account-panel.js';
 import {configured, friendlyError} from './cloud.js';
 import {createWeeklyEmailUI} from './weekly-email-ui.js';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-export function createAccountUI({cloud,getState,getLocal,modal,close,toast,exportData,getData=()=>({profiles:[]}),openProfile,editProfile,removeProfile,addProfile,openReminders}) {
-  let authMode='login',section='overview',generation=0,accountId=null;
+export function createAccountUI({cloud,getState,getLocal,modal,close,toast,exportData,getData=()=>({profiles:[]}),openProfile,editProfile,removeProfile,addProfile,openReminders,getActiveProfile=()=>null,getSelectedDate=dateKey,onDataChange=()=>{}}) {
+  let authMode='login',section='overview',generation=0,accountId=null,patternProfile=null,patternDate=null;
   const reportModal=html=>modal(html+button('← Back to control panel','back','quiet full'));
   const weeklyEmail=createWeeklyEmailUI({cloud,getState,modal:reportModal,toast});
   const button=(text,action,style='secondary full')=>`<button type="button" class="${style}" data-account="${action}">${text}</button>`;
   function show() {
     const state=getState(),ticket=++generation;
-    if(accountId!==state.user?.uid){section='overview';accountId=state.user?.uid;}
+    if(accountId!==state.user?.uid){section='overview';patternProfile=null;patternDate=null;accountId=state.user?.uid;}
     let body='';
     if(!configured) {
       body=`<div class="eyebrow">CLOUD SAVING IS NEXT</div><h2>One family. Every device.</h2><p>Firebase is ready to connect, but the app owner still needs to finish setup. Your existing profiles continue saving on this device.</p><a class="primary full" href="./firebase-setup.html" target="_blank" rel="noopener">View setup instructions ↗</a>`;
@@ -23,15 +25,29 @@ export function createAccountUI({cloud,getState,getLocal,modal,close,toast,expor
       body=`<div class="eyebrow">YOUR FAMILY’S SPACE</div><h2>Bring your days together.</h2><p>Signed in as ${esc(state.user.email)}.</p>${state.error?`<p class="form-error">${esc(state.error)}</p>${button('Try loading again','retry')}`:''}<form id="create-family"><label>Start a new family space<input name="name" placeholder="e.g. Our family" maxlength="60" required></label><button class="primary full">Create family space ↗</button></form><hr><form id="join-family"><label>Already invited? Enter your family code<input name="code" placeholder="Code shared by the family owner" required maxlength="128" autocomplete="off"></label><p class="fine">The owner must invite ${esc(state.user.email)} first. If your spouse already created a space, join theirs instead of creating another.</p><button class="secondary full">Join family</button></form>${button('Sign out','logout','quiet full')}`;
     } else {
       let local;try{local=getLocal();}catch{local={profiles:[]};}
-      modal(accountPanel({state,data:getData(),local,section}));bindForms();
+      modal(accountPanel({state,data:getData(),local,section,patternsHTML:section==='patterns'?patternsHTML():''}));bindForms();bindPatterns();
       if(section==='access')cloud.accessList().then(list=>{
         const target=document.querySelector('#panel-access-list');
         if(ticket===generation&&getState().user?.uid===state.user.uid&&getState().family?.id===state.family.id&&target)target.innerHTML=accessRows(list,state);
       }).catch(error=>{const target=document.querySelector('#panel-access-list');if(ticket===generation&&target)target.textContent=friendlyError(error);});
       return;
     }
-    modal(`${body}<div id="account-message" role="status"></div><hr><h3>Keep a copy</h3><p class="fine">Download a backup of the profiles currently open.</p>${button('↓ Export backup','export')}`);
+    if(section==='patterns'){modal(patternsHTML()+button('← Back to account','patterns-back','quiet full'));bindPatterns();return;}
+    modal(`${body}${live(getData().profiles).length?button('Notice your patterns','section-patterns'):''}<div id="account-message" role="status"></div><hr><h3>Keep a copy</h3><p class="fine">Download a backup of the profiles currently open.</p>${button('↓ Export backup','export')}`);
     bindForms();
+  }
+  function patternsHTML() {
+    const data=getData(),profiles=live(data.profiles);
+    if(!profiles.some(p=>p.id===patternProfile))patternProfile=profiles.find(p=>p.id===getActiveProfile())?.id||profiles[0]?.id;
+    patternDate=patternDate||getSelectedDate()||dateKey();
+    const profile=profiles.find(p=>p.id===patternProfile);
+    if(!profile)return '<h3>Notice your patterns</h3><p>Add a family profile to see weekly trends.</p>';
+    return '<div class="pattern-controls form-row"><label>Profile<select id="pattern-profile">'+profiles.map(p=>'<option value="'+esc(p.id)+'" '+(p.id===profile.id?'selected':'')+'>'+esc(p.name)+'</option>').join('')+'</select></label><label>Week containing<input type="date" id="pattern-date" value="'+esc(patternDate)+'" required></label></div>'+insightsView(data,profile,patternDate).replaceAll('data-action="time-targets"','data-account="pattern-targets"');
+  }
+  function bindPatterns(){
+    const profile=document.querySelector('#pattern-profile'),date=document.querySelector('#pattern-date');
+    if(profile)profile.onchange=()=>{patternProfile=profile.value;show();};
+    if(date)date.onchange=()=>{if(date.value&&date.checkValidity()){patternDate=date.value;show();}};
   }
   async function run(action,{refresh=true}={}) {
     const dialog=document.querySelector('#modal');
@@ -56,6 +72,8 @@ export function createAccountUI({cloud,getState,getLocal,modal,close,toast,expor
       document.querySelector('#confirm-parent-removal').onclick=()=>run(async()=>{if(getState().user?.uid!==state.user.uid||getState().family?.id!==state.family.id)throw Error('Your account changed. Reopen access settings.');await cloud.removeMember(uid);});return;}
     if(el.dataset.revokeInvite){run(async()=>{await cloud.revokeInvite(el.dataset.revokeInvite);});return;}
     if(el.dataset.panelProfile){openProfile?.(el.dataset.panelProfile);return;}if(el.dataset.panelEdit){editProfile?.(el.dataset.panelEdit,show);return;}if(el.dataset.panelRemove){removeProfile?.(el.dataset.panelRemove);return;}if(el.dataset.panelReminder){openReminders?.(el.dataset.panelReminder);return;}const action=el.dataset.account;if(!action)return;
+    if(action==='patterns-back'){section='overview';show();return;}
+    if(action==='pattern-targets'){const profile=live(getData().profiles).find(p=>p.id===patternProfile);if(profile)targetsModal({data:getData(),profile,getData,modal:html=>modal(html+button('← Back to patterns','back','quiet full')),close:()=>{},changed:()=>{onDataChange();show();}});return;}
     if(action.startsWith('section-')){section=action.slice(8);show();return;}
     if(action==='add-profile'){addProfile?.();return;}
     if(action==='reset-current'){run(async()=>{await cloud.resetPassword(getState().user.email);toast('Password reset email sent. Check your inbox.');});return;}

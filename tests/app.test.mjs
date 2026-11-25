@@ -35,8 +35,11 @@ test('unconfigured cloud keeps local onboarding, activity logging, and setup acc
     doc.querySelector('#entry-form').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));
     assert.equal(JSON.parse(window.localStorage.getItem('forge-data')).entries[0].minutes,60);
     assert.match(doc.querySelector('.activities-card').textContent,/Practice/);
+    assert.equal(doc.querySelector('main .insights-card'),null,'patterns have moved off dashboard');
     assert.match(doc.querySelector('.time-balance').textContent,/23h/);
-    doc.querySelector('[data-action="time-targets"]').click();
+    doc.querySelector('[data-action="settings"]').click();
+    doc.querySelector('[data-account="section-patterns"]').click();
+    doc.querySelector('[data-account="pattern-targets"]').click();
     const targetForm=doc.querySelector('#time-target-form');
     targetForm.elements['budget-rest'].value='70';
     targetForm.elements['budget-learn'].value='100';
@@ -53,7 +56,7 @@ test('unconfigured cloud keeps local onboarding, activity logging, and setup acc
     assert.equal(withTargets.activities.find(a=>a.id===practice.id).screenTime,true);
     assert.match(doc.querySelector('.screen-summary').textContent,/1h of screen time/);
     assert.match(doc.querySelector('.screen-summary').textContent,/6h left/);
-    doc.querySelector('[data-action="time-targets"]').click();
+    doc.querySelector('[data-account="pattern-targets"]').click();
     assert.equal(doc.querySelector('[name="screen-limit"]').value,'7');
     doc.querySelector('[data-action="close"]').click();
     doc.querySelector('[data-action="add"]').click();

@@ -21,3 +21,20 @@ test('panel navigation opens profile controls and requires confirmation for pare
     window.document.querySelector('[data-account=section-access]').click();await new Promise(r=>setTimeout(r,5));window.document.querySelector('[data-remove-member]').click();assert.deepEqual(removed,[]);assert.match(window.document.body.textContent,/Remove parent access/);window.document.querySelector('#confirm-parent-removal').click();await new Promise(r=>setTimeout(r,5));assert.deepEqual(removed,['spouse']);
   }finally{window.happyDOM.abort();Object.assign(globalThis,old);}
 });
+
+
+test('patterns section switches profile and week and returns after saving targets',()=>{
+  const window=new Window(),old={document:globalThis.document,FormData:globalThis.FormData};Object.assign(globalThis,{document:window.document,FormData:window.FormData});
+  const familyData={profiles:[{id:'a',name:'Alex'},{id:'b',name:'Blair'}],activities:[],entries:[],goals:[],routines:[]};let saves=0;
+  try {
+    const ui=createAccountUI({cloud:{},getState:()=>state,getData:()=>familyData,getLocal:()=>({profiles:[]}),modal:html=>window.document.body.innerHTML='<dialog id="modal">'+html+'</dialog>',close(){},toast(){},exportData(){},getActiveProfile:()=> 'b',getSelectedDate:()=> '2026-11-23',onDataChange:()=>saves++});
+    ui.show();window.document.querySelector('[data-account=section-patterns]').click();
+    assert.equal(window.document.querySelector('#pattern-profile').value,'b');assert.match(window.document.body.textContent,/For Blair/);
+    const profile=window.document.querySelector('#pattern-profile');profile.value='a';profile.dispatchEvent(new window.Event('change'));
+    const date=window.document.querySelector('#pattern-date');date.value='2026-11-16';date.dispatchEvent(new window.Event('change'));
+    assert.match(window.document.body.textContent,/For Alex/);assert.match(window.document.body.textContent,/2026-11-16/);
+    window.document.querySelector('[data-account=pattern-targets]').click();
+    window.document.querySelector('#time-target-form').dispatchEvent(new window.Event('submit',{cancelable:true}));
+    assert.equal(saves,1);assert.equal(window.document.querySelector('#pattern-date').value,'2026-11-16');assert.equal(window.document.querySelector('#pattern-profile').value,'a');
+  }finally{window.happyDOM.abort();Object.assign(globalThis,old);}
+});
